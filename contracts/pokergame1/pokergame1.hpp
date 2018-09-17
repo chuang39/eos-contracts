@@ -36,7 +36,8 @@ public:
             :contract(self),
              pools(_self, _self),
              events(_self, _self),
-             metadatas(_self, _self){};
+             metadatas(_self, _self),
+             secrets(_self, _self){};
     //@abi action
     void dealreceipt(const name from, string hash1, string hash2, string card1, string card2, string card3, string card4, string card5, uint64_t bet, uint64_t win);
     //@abi action
@@ -63,9 +64,10 @@ private:
     struct st_metadatas {
         uint64_t id;
         uint32_t eventcnt;
+        uint32_t idx;
         uint64_t primary_key() const { return id; }
 
-        EOSLIB_SERIALIZE(st_metadatas, (id)(eventcnt))
+        EOSLIB_SERIALIZE(st_metadatas, (id)(eventcnt)(idx))
     };
 
     // @abi table pools i64
@@ -108,10 +110,20 @@ private:
         EOSLIB_SERIALIZE(st_events, (id)(owner)(datetime)(wintype)(ratio)(bet)(betwin)(card1)(card2)(card3)(card4)(card5))
     };
 
+    // @abi table secrets i64
+    struct st_secrets {
+        uint64_t id;
+        uint64_t s1;
+        uint64_t primary_key() const { return id; }
+        EOSLIB_SERIALIZE(st_secrets, (id)(s1))
+    };
+
     typedef multi_index<N(metadatas), st_metadatas> _tb_metadatas;
     _tb_metadatas metadatas;
     typedef multi_index<N(pools), st_pools> _tb_pools;
     _tb_pools pools;
     typedef multi_index<N(events), st_events> _tb_events;
     _tb_events events;
+    typedef multi_index<N(secrets), st_secrets> _tb_secrets;
+    _tb_secrets secrets;
 };

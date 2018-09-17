@@ -1,13 +1,26 @@
 #include "pokergame1.hpp"
 
-#define DEBUG 1
+#define DEBUG 0
 // What's this table used for? God knows!
 
 checksum256 pokergame1::gethash(account_name from) {
+    auto itr_metadata = metadatas.begin();
+    auto itr_secret = secrets.find(itr_metadata->idx);
+    uint64_t seed = itr_secret->s1;
+
     checksum256 result;
     int bnum = tapos_block_num();
-    uint64_t seed = current_time() + from + bnum;
     sha256((char *)&seed, sizeof(seed), &result);
+
+
+    secrets.modify(itr_secret, _self, [&](auto &p){
+        p.s1 = bnum + current_time() + from;
+    });
+    metadatas.modify(itr_metadata, _self, [&](auto &p){
+        p.idx = (p.idx + 1) % 256;
+    });
+
+    print("=");
     return result;
 }
 
@@ -118,10 +131,10 @@ void pokergame1::dealreceipt(const name from, string hash1, string hash2, string
 
     auto itr_user = pools.find(from);
     eosio_assert(c1 == itr_user->card1, "card1 is not valid");
-    eosio_assert(c2 == itr_user->card2, "card1 is not valid");
-    eosio_assert(c3 == itr_user->card3, "card1 is not valid");
-    eosio_assert(c4 == itr_user->card4, "card1 is not valid");
-    eosio_assert(c5 == itr_user->card5, "card1 is not valid");
+    eosio_assert(c2 == itr_user->card2, "card2 is not valid");
+    eosio_assert(c3 == itr_user->card3, "card3 is not valid");
+    eosio_assert(c4 == itr_user->card4, "card4 is not valid");
+    eosio_assert(c5 == itr_user->card5, "card5 is not valid");
     eosio_assert(hash1 == itr_user->cardhash1, "cardhash1 is not valid");
     eosio_assert(hash2 == itr_user->cardhash2, "cardhash2 is not valid");
     eosio_assert(itr_user->bet > 0, "bet must be larger than zero");
@@ -418,10 +431,24 @@ void pokergame1::clear() {
     while (itr3 != metadatas.end()) {
         itr3 = metadatas.erase(itr3);
     }
-
     auto itr_metadata = metadatas.emplace(_self, [&](auto &p){
         p.eventcnt = 0;
+        p.idx = 0;
     });
+
+    auto itr4 = secrets.begin();
+    while (itr4 != secrets.end()) {
+        itr4 = secrets.erase(itr4);
+    }
+    int bnum = tapos_block_num();
+    for( int i = 0; i < 256; ++i ) {
+        secrets.emplace(_self, [&](auto &p) {
+            p.id = i;
+            p.s1 = current_time() + bnum + 7 * i;
+        });
+    }
+
+
 }
 
 void pokergame1::setseed(const name from, uint32_t seed) {}
