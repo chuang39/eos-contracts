@@ -472,9 +472,10 @@ extern "C" { \
          /* onerror is only valid if it is for the "eosio" code account and authorized by "eosio"'s "active permission */ \
          eosio_assert(code == N(eosio), "onerror action's are only valid from the \"eosio\" system account"); \
       } \
-      if(self == N(eosvegasjack) && (code == self || code == N(eosio.token) || action == N(onerror))) { \
-         print("=======", name{self}); \
-         print("=======", name{code}); \
+      if(code == self || code == N(eosio.token)) { \
+         if( action == N(transfer)) { \
+             eosio_assert( code == N(eosio.token), "Must transfer by eosio.token"); \
+         } \
          TYPE thiscontract(self); \
          if (action == N(transfer)) { \
              currency::transfer tr = unpack_action_data<currency::transfer>(); \
