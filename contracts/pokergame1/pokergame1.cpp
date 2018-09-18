@@ -47,6 +47,9 @@ void pokergame1::deposit(const currency::transfer &t, account_name code) {
     eosio_assert(t.quantity.symbol == string_to_symbol(4, "EOS"), "Only accepts EOS for deposits");
     eosio_assert(t.quantity.is_valid(), "Invalid token transfer");
     eosio_assert(t.quantity.amount > 0, "Quantity must be positive");
+    auto itr_metadata = metadatas.begin();
+    eosio_assert(itr_metadata != metadatas.end(), "No game found.");
+    eosio_assert(itr_metadata->gameon == 1, "Game is paused temporarily.");
 
     account_name user = t.from;
     auto amount = t.quantity.amount;
@@ -191,7 +194,7 @@ void pokergame1::dealreceipt(const name from, string hash1, string hash2, string
         // withdraw
         action(permission_level{_self, N(active)}, N(eosio.token),
                N(transfer), std::make_tuple(_self, from, bal,
-                                            std::string("See you at MyEosVegas.com next time!")))
+                                            std::string("Winner winner chicken dinner!")))
                 .send();
     }
 }
@@ -431,15 +434,22 @@ void pokergame1::clear() {
     while (itr3 != metadatas.end()) {
         itr3 = metadatas.erase(itr3);
     }
-    auto itr_metadata = metadatas.emplace(_self, [&](auto &p){
-        p.eventcnt = 0;
-        p.idx = 0;
-    });
-
     auto itr4 = secrets.begin();
     while (itr4 != secrets.end()) {
         itr4 = secrets.erase(itr4);
     }
+}
+
+void pokergame1::init() {
+    require_auth(_self);
+    auto itr3 = metadatas.begin();
+    auto itr_metadata = metadatas.emplace(_self, [&](auto &p){
+        p.eventcnt = 0;
+        p.idx = 0;
+        p.gameon = 1;
+    });
+
+    auto itr4 = secrets.begin();
     int bnum = tapos_block_num();
     for( int i = 0; i < 256; ++i ) {
         secrets.emplace(_self, [&](auto &p) {
@@ -447,7 +457,14 @@ void pokergame1::clear() {
             p.s1 = current_time() + bnum + 7 * i;
         });
     }
+}
 
+void pokergame1::setgameon(uint32_t flag) {
+    require_auth(_self);
+    auto itr = metadatas.begin();
+    metadatas.modify(itr, _self, [&](auto &p){
+        p.gameon = flag;
+    });
 
 }
 
@@ -497,4 +514,4 @@ extern "C" { \
    } \
 }
 
-EOSIO_ABI_EX(pokergame1, (dealreceipt)(drawcards)(clear)(setseed)(setcards))
+EOSIO_ABI_EX(pokergame1, (dealreceipt)(drawcards)(clear)(setseed)(setcards)(init)(setgameon))

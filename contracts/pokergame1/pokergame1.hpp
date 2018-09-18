@@ -45,9 +45,13 @@ public:
     //@abi action
     void clear();
     //@abi action
+    void init();
+    //@abi action
     void setcards(const name from, uint32_t c1, uint32_t c2, uint32_t c3, uint32_t c4, uint32_t c5);
     //@abi action
     void setseed(const name from, uint32_t seed);
+    //@abi action
+    void setgameon(uint32_t flag);
     checksum256 gethash(account_name from);
     uint32_t getcard(account_name from, checksum256 result);
     void deposit(const currency::transfer &t, account_name code);
@@ -65,9 +69,10 @@ private:
         uint64_t id;
         uint32_t eventcnt;
         uint32_t idx;
+        uint32_t gameon;
         uint64_t primary_key() const { return id; }
 
-        EOSLIB_SERIALIZE(st_metadatas, (id)(eventcnt)(idx))
+        EOSLIB_SERIALIZE(st_metadatas, (id)(eventcnt)(idx)(gameon))
     };
 
     // @abi table pools i64
@@ -110,7 +115,6 @@ private:
         EOSLIB_SERIALIZE(st_events, (id)(owner)(datetime)(wintype)(ratio)(bet)(betwin)(card1)(card2)(card3)(card4)(card5))
     };
 
-    // @abi table secrets i64
     struct st_secrets {
         uint64_t id;
         uint64_t s1;
