@@ -3,6 +3,24 @@
 #define DEBUG 0
 // What's this table used for? God knows!
 
+
+uint64_t miningtable[5][2] = {{4000000, 1000}, // 1EOS 10MEV
+                              {4000000 * 2, 5000}, // 1EOS 2MEV
+                               {4000000 * 3, 10000}, // 1EOS 1MEV
+                               {4000000 * 4, 20000}, // 2EOS 1MEV
+                               {4000000 * 5, 100000} // 10EOS 1MEV
+                              };
+
+uint64_t get_miningtable_price(uint64_t sold_keys) {
+    for (int i = 0; i < 5; i++) {
+        if (sold_keys < miningtable[i][0]) {
+            return miningtable[i][1];
+        }
+    }
+    return 0;
+}
+
+
 checksum256 pokergame1::gethash(account_name from) {
     auto itr_metadata = metadatas.begin();
     auto itr_secret = secrets.find(itr_metadata->idx);
@@ -119,7 +137,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code) {
     });
 }
 
-void pokergame1::dealreceipt(const name from, string hash1, string hash2, string card1, string card2, string card3, string card4, string card5, uint64_t bet, uint64_t win) {
+void pokergame1::dealreceipt(const name from, string hash1, string hash2, string card1, string card2, string card3, string card4, string card5, string betineos, string winineos, uint64_t betnum, uint64_t winnum) {
 
     uint32_t c1 = parsecard(card1);
     eosio_assert(c1 < 52, "card1 larger than 51");
@@ -141,12 +159,11 @@ void pokergame1::dealreceipt(const name from, string hash1, string hash2, string
     eosio_assert(hash1 == itr_user->cardhash1, "cardhash1 is not valid");
     eosio_assert(hash2 == itr_user->cardhash2, "cardhash2 is not valid");
     eosio_assert(itr_user->bet > 0, "bet must be larger than zero");
-    eosio_assert(bet == itr_user->bet, "Bet does not match.");
-    eosio_assert(win == itr_user->betwin, "Win does not match.");
-
+    eosio_assert(betnum == itr_user->bet, "Bet does not match.");
+    eosio_assert(winnum == itr_user->betwin, "Win does not match.");
 
     // update events. use metadata table to count the number of events
-    auto itr_metadata = metadatas.begin();
+    auto itr_metadata = metadatas.find(0);
     uint32_t ratios[10] = {0, 1, 2, 3, 4, 5, 8, 20, 50, 250};
     if (itr_user->wintype >= 1) {
         events.emplace(_self, [&](auto &p){
@@ -197,6 +214,13 @@ void pokergame1::dealreceipt(const name from, string hash1, string hash2, string
                                             std::string("Winner winner chicken dinner!")))
                 .send();
     }
+
+    //get_miningtable_price()
+    asset bal2 = asset(1, symbol_type(S(4, MEV)));
+    action(permission_level{_self, N(active)}, N(eosvegascoin),
+           N(transfer), std::make_tuple(N(eosvegasjack), from, bal2,
+                                        std::string("Gaming deserves rewards!")))
+            .send();
 }
 
 void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5) {
@@ -447,6 +471,7 @@ void pokergame1::init() {
         p.eventcnt = 0;
         p.idx = 0;
         p.gameon = 1;
+        p.miningon = 0;
     });
 
     auto itr4 = secrets.begin();
@@ -459,18 +484,32 @@ void pokergame1::init() {
     }
 }
 
-void pokergame1::setgameon(uint32_t flag) {
+void pokergame1::setgameon(uint64_t id, uint32_t flag) {
     require_auth(_self);
-    auto itr = metadatas.begin();
-    metadatas.modify(itr, _self, [&](auto &p){
-        p.gameon = flag;
-    });
-
+    auto itr = metadatas.find(id);
+    if (itr != metadatas.end()) {
+        metadatas.modify(itr, _self, [&](auto &p) {
+            p.gameon = flag;
+        });
+    }
 }
 
-void pokergame1::setseed(const name from, uint32_t seed) {}
+void pokergame1::setminingon(uint64_t id, uint32_t flag) {
+    require_auth(_self);
+    auto itr = metadatas.find(id);
+    if (itr != metadatas.end()) {
+        metadatas.modify(itr, _self, [&](auto &p) {
+            p.miningon = flag;
+        });
+    }
+}
+
+void pokergame1::setseed(const name from, uint32_t seed) {
+    int32_t ram_bytes = action_data_size();
+}
 
 void pokergame1::setcards(const name from, uint32_t c1, uint32_t c2, uint32_t c3, uint32_t c4, uint32_t c5) {
+    require_auth(_self);
     auto itr_user1 = pools.find(from);
     pools.modify(itr_user1, _self, [&](auto &p){
         p.card1 = c1;
@@ -490,26 +529,23 @@ extern "C" { \
          eosio_assert(code == N(eosio), "onerror action's are only valid from the \"eosio\" system account"); \
       } \
       if(code == self || code == N(eosio.token)) { \
-         if( action == N(transfer)) { \
-             eosio_assert( code == N(eosio.token), "Must transfer by eosio.token"); \
-         } \
-         TYPE thiscontract(self); \
-         if (action == N(transfer)) { \
-             currency::transfer tr = unpack_action_data<currency::transfer>(); \
-             if (tr.to == self) { \
-                 thiscontract.deposit(tr, code); \
-             } \
-             return; \
-         } \
-         if (action == N(pong2)) { \
-            return; \
-         } \
-         if (code != self) { \
-             return; \
-         } \
-         switch(action) { \
-            EOSIO_API(TYPE, MEMBERS) \
-         } \
+          TYPE thiscontract(self); \
+          if (action == N(transfer) && code == self) { \
+              return; \
+          } \
+          if (action == N(transfer) && code == N(eosio.token)) { \
+              currency::transfer tr = unpack_action_data<currency::transfer>(); \
+              if (tr.to == self) { \
+                  thiscontract.deposit(tr, code); \
+              } \
+              return; \
+          } \
+          if (code != self) { \
+              return; \
+          } \
+          switch(action) { \
+              EOSIO_API(TYPE, MEMBERS) \
+          } \
       } \
    } \
 }

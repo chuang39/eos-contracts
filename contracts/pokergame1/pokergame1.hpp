@@ -39,7 +39,7 @@ public:
              metadatas(_self, _self),
              secrets(_self, _self){};
     //@abi action
-    void dealreceipt(const name from, string hash1, string hash2, string card1, string card2, string card3, string card4, string card5, uint64_t bet, uint64_t win);
+    void dealreceipt(const name from, string hash1, string hash2, string card1, string card2, string card3, string card4, string card5, string betineos, string winineos, uint64_t betnum, uint64_t winnum);
     //@abi action
     void drawcards(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5);
     //@abi action
@@ -62,14 +62,15 @@ public:
     bool checkBiggerJack(uint32_t numbers[5]);
     uint32_t parsecard(string s);
 
-
 private:
+    // 0: jacks or better
     // @abi table metadatas i64
     struct st_metadatas {
         uint64_t id;
         uint32_t eventcnt;
         uint32_t idx;
         uint32_t gameon;
+        uint32_t miningon;
         uint64_t primary_key() const { return id; }
 
         EOSLIB_SERIALIZE(st_metadatas, (id)(eventcnt)(idx)(gameon))
