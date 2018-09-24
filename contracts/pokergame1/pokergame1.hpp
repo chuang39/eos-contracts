@@ -51,7 +51,9 @@ public:
     //@abi action
     void setseed(const name from, uint32_t seed);
     //@abi action
-    void setgameon(uint32_t flag);
+    void setgameon(uint64_t id, uint32_t flag);
+    //@abi action
+    void setminingon(uint64_t id, uint32_t flag);
     checksum256 gethash(account_name from);
     uint32_t getcard(account_name from, checksum256 result);
     void deposit(const currency::transfer &t, account_name code);

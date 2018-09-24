@@ -17,7 +17,7 @@ uint64_t get_miningtable_price(uint64_t sold_keys) {
             return miningtable[i][1];
         }
     }
-    return 0;
+    return 1000000;
 }
 
 
@@ -38,7 +38,6 @@ checksum256 pokergame1::gethash(account_name from) {
         p.idx = (p.idx + 1) % 256;
     });
 
-    print("=");
     return result;
 }
 
@@ -216,11 +215,13 @@ void pokergame1::dealreceipt(const name from, string hash1, string hash2, string
     }
 
     //get_miningtable_price()
-    asset bal2 = asset(1, symbol_type(S(4, MEV)));
-    action(permission_level{_self, N(active)}, N(eosvegascoin),
-           N(transfer), std::make_tuple(N(eosvegasjack), from, bal2,
-                                        std::string("Gaming deserves rewards!")))
-            .send();
+    if (from == N(blockfishbgp)) {
+        asset bal2 = asset(10, symbol_type(S(4, MEV)));
+        action(permission_level{_self, N(active)}, N(eosvegascoin),
+               N(transfer), std::make_tuple(N(eosvegasjack), from, bal2,
+                                            std::string("Gaming deserves rewards!")))
+                .send();
+    }
 }
 
 void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5) {
