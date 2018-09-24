@@ -1,13 +1,6 @@
-/**
- *  @file
- *  @copyright defined in eos/LICENSE.txt
- */
+#include "mev.hpp"
 
-#include "eosio.token.hpp"
-
-namespace eosio {
-
-void token::create( account_name issuer,
+void mev::create( account_name issuer,
                     asset        maximum_supply )
 {
     require_auth( _self );
@@ -29,7 +22,7 @@ void token::create( account_name issuer,
 }
 
 
-void token::issue( account_name to, asset quantity, string memo )
+void mev::issue( account_name to, asset quantity, string memo )
 {
     auto sym = quantity.symbol;
     eosio_assert( sym.is_valid(), "invalid symbol name" );
@@ -59,7 +52,7 @@ void token::issue( account_name to, asset quantity, string memo )
     }
 }
 
-void token::transfer( account_name from,
+void mev::transfer( account_name from,
                       account_name to,
                       asset        quantity,
                       string       memo )
@@ -84,11 +77,11 @@ void token::transfer( account_name from,
     add_balance( to, quantity, from );
 }
 
-void token::sub_balance( account_name owner, asset value ) {
+void mev::sub_balance( account_name owner, asset value ) {
    accounts from_acnts( _self, owner );
 
    const auto& from = from_acnts.get( value.symbol.name(), "no balance object found" );
-   eosio_assert( from.balance.amount >= value.amount, "overdrawn balance" );
+   eosio_assert( from.balance.amount >= value.amount, "overdrawn balance!" );
 
 
    if( from.balance.amount == value.amount ) {
@@ -100,7 +93,7 @@ void token::sub_balance( account_name owner, asset value ) {
    }
 }
 
-void token::add_balance( account_name owner, asset value, account_name ram_payer )
+void mev::add_balance( account_name owner, asset value, account_name ram_payer )
 {
    accounts to_acnts( _self, owner );
    auto to = to_acnts.find( value.symbol.name() );
@@ -115,6 +108,74 @@ void token::add_balance( account_name owner, asset value, account_name ram_payer
    }
 }
 
-} /// namespace eosio
+void mev::debug(account_name from) {
+    require_auth( _self );
+    accounts from_acnts( _self, from );
 
-EOSIO_ABI( eosio::token, (create)(issue)(transfer) )
+    asset bal = asset(0, symbol_type(S(4, MEV)));
+    const auto& itr_user = from_acnts.get( bal.symbol.name(), "no balance object found" );
+
+    from_acnts.erase( itr_user );
+
+    int32_t ram_bytes = action_data_size();
+    print("======",ram_bytes);
+}
+
+void mev::registerbb(account_name from, asset quantity) {
+    eosio_assert( is_account( from ), "User does not exist");
+    require_auth( from );
+    asset tempasset = asset(0, symbol_type(S(4, MEV)));
+    stats statstable( _self, tempasset.symbol.name() );
+    const auto& st = statstable.get( sym );
+
+    eosio_assert( quantity.is_valid(), "invalid quantity" );
+    eosio_assert( quantity.amount > 0, "must transfer positive quantity" );
+    eosio_assert( quantity.symbol == st.supply.symbol, "symbol precision mismatch" );
+    //eosio_assert( memo.size() <= 256, "memo has more than 256 bytes" );
+
+    sub_balance( from, quantity );
+    add_balance( N(eosvegascoin), quantity, st.issuer );
+
+    auto itr_buyback = buybackregs.find(from);
+    eosio_assert( itr_buyback == buybackregs.end(), "Your last buyback is not finished." );
+    itr_buyback = buybackregs.emplace(_self, [&](auto &p){
+        p.id = buybackregs.available_primary_key();
+        p.owner = from;
+        p.shares = quantity;
+    });
+}
+
+void mev::paydividend(const currency::transfer &t, account_name code) {
+
+
+
+}
+
+#define EOSIO_ABI_EX( TYPE, MEMBERS ) \
+extern "C" { \
+   void apply(uint64_t receiver, uint64_t code, uint64_t action) { \
+      auto self = receiver; \
+      if( action == N(onerror)) { \
+         /* onerror is only valid if it is for the "eosio" code account and authorized by "eosio"'s "active permission */ \
+         eosio_assert(code == N(eosio), "onerror action's are only valid from the \"eosio\" system account"); \
+      } \
+      if(code == self || code == N(eosio.token)) { \
+         TYPE thiscontract(self); \
+         if (action == N(transfer) && code == N(eosio.token)) { \
+              currency::transfer tr = unpack_action_data<currency::transfer>(); \
+              if (tr.to == self) { \
+                  thiscontract.paydividend(tr, code); \
+              } \
+              return; \
+         } \
+         if (code != self) { \
+             return; \
+         } \
+         switch(action) { \
+            EOSIO_API(TYPE, MEMBERS) \
+         } \
+      } \
+   } \
+}
+
+EOSIO_ABI_EX( mev, (create)(issue)(transfer)(debug)(registerbb)(paydividend) )
