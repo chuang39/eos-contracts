@@ -83,6 +83,13 @@ void pokergame1::signup(const name from) {
     auto itr_user1 = pools.find(from);
     eosio_assert(itr_user1 == pools.end(), "User is already signed up.");
     asset bal2 = asset(1000000, symbol_type(S(4, MEV)));
+
+    // report mining
+    uint64_t minemev = 1000000;
+    uint64_t meosin = 0;
+    uint64_t meosout = 0;
+    report(from, minemev, meosin, meosout);
+
     action(permission_level{_self, N(active)}, N(eosvegascoin),
            N(transfer), std::make_tuple(N(eosvegasjack), from, bal2,
                                         std::string(name{from}.to_string() + ", welcome on board! 100 MEV is prepared as gift for your journey!")))
@@ -190,66 +197,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
     });
 }
 
-void pokergame1::dealreceipt(const name from, string hash1, string hash2, string card1, string card2, string card3, string card4, string card5, string betineos, string winineos, uint64_t betnum, uint64_t winnum) {
-
-    uint32_t c1 = parsecard(card1);
-    eosio_assert(c1 < 52, "card1 larger than 51");
-    uint32_t c2 = parsecard(card2);
-    eosio_assert(c2 < 52, "card2 larger than 51");
-    uint32_t c3 = parsecard(card3);
-    eosio_assert(c3 < 52, "card3 larger than 51");
-    uint32_t c4 = parsecard(card4);
-    eosio_assert(c4 < 52, "card4 larger than 51");
-    uint32_t c5 = parsecard(card5);
-    eosio_assert(c5 < 52, "card5 larger than 51");
-
-    auto itr_user = pools.find(from);
-    eosio_assert(c1 == itr_user->card1, "card1 is not valid");
-    eosio_assert(c2 == itr_user->card2, "card2 is not valid");
-    eosio_assert(c3 == itr_user->card3, "card3 is not valid");
-    eosio_assert(c4 == itr_user->card4, "card4 is not valid");
-    eosio_assert(c5 == itr_user->card5, "card5 is not valid");
-    eosio_assert(hash1 == itr_user->cardhash1, "cardhash1 is not valid");
-    eosio_assert(hash2 == itr_user->cardhash2, "cardhash2 is not valid");
-    eosio_assert(itr_user->bet > 0, "bet must be larger than zero");
-    eosio_assert(betnum == itr_user->bet, "Bet does not match.");
-    eosio_assert(winnum == itr_user->betwin, "Win does not match.");
-
-    // update events. use metadata table to count the number of events
-    auto itr_metadata = metadatas.find(0);
-    uint32_t ratios[10] = {0, 1, 2, 3, 4, 5, 8, 20, 50, 250};
-    if (itr_user->wintype >= 1) {
-        events.emplace(_self, [&](auto &p){
-            p.id = events.available_primary_key();
-            p.owner = from;
-            p.datetime = now();
-            p.wintype = itr_user->wintype;
-            p.ratio = ratios[itr_user->wintype];
-            p.bet = itr_user->bet;
-            p.betwin = itr_user->betwin;
-            p.card1 = itr_user->card1;
-            p.card2 = itr_user->card2;
-            p.card3 = itr_user->card3;
-            p.card4 = itr_user->card4;
-            p.card5 = itr_user->card5;
-        });
-        eosio_assert(itr_metadata != metadatas.end(), "Metadata is empty.");
-        metadatas.modify(itr_metadata, _self, [&](auto &p){
-            p.eventcnt = p.eventcnt + 1;
-        });
-    }
-    if (itr_metadata->eventcnt > 32) {
-        auto itr_event2 = events.begin();
-        events.erase(itr_event2);
-        metadatas.modify(itr_metadata, _self, [&](auto &p){
-            p.eventcnt = p.eventcnt - 1;
-        });
-    }
-
-    uint64_t mineprice = getminingtableprice(itr_metadata->teosin);
-    uint64_t minemev = itr_user->bet * mineprice / 100;
-    uint64_t meosin = itr_user->bet;
-    uint64_t meosout = itr_user->betwin;
+void report(account_name from, uint64_t minemev, uint64_t meosin, uint64_t meosout) {
     metadatas.modify(itr_metadata, _self, [&](auto &p) {
         p.tmevout += minemev;
         p.teosin += meosin;
@@ -369,7 +317,71 @@ void pokergame1::dealreceipt(const name from, string hash1, string hash2, string
             p.meosout = newmeosout;
         });
     }
+}
 
+
+void pokergame1::dealreceipt(const name from, string hash1, string hash2, string card1, string card2, string card3, string card4, string card5, string betineos, string winineos, uint64_t betnum, uint64_t winnum) {
+
+    uint32_t c1 = parsecard(card1);
+    eosio_assert(c1 < 52, "card1 larger than 51");
+    uint32_t c2 = parsecard(card2);
+    eosio_assert(c2 < 52, "card2 larger than 51");
+    uint32_t c3 = parsecard(card3);
+    eosio_assert(c3 < 52, "card3 larger than 51");
+    uint32_t c4 = parsecard(card4);
+    eosio_assert(c4 < 52, "card4 larger than 51");
+    uint32_t c5 = parsecard(card5);
+    eosio_assert(c5 < 52, "card5 larger than 51");
+
+    auto itr_user = pools.find(from);
+    eosio_assert(c1 == itr_user->card1, "card1 is not valid");
+    eosio_assert(c2 == itr_user->card2, "card2 is not valid");
+    eosio_assert(c3 == itr_user->card3, "card3 is not valid");
+    eosio_assert(c4 == itr_user->card4, "card4 is not valid");
+    eosio_assert(c5 == itr_user->card5, "card5 is not valid");
+    eosio_assert(hash1 == itr_user->cardhash1, "cardhash1 is not valid");
+    eosio_assert(hash2 == itr_user->cardhash2, "cardhash2 is not valid");
+    eosio_assert(itr_user->bet > 0, "bet must be larger than zero");
+    eosio_assert(betnum == itr_user->bet, "Bet does not match.");
+    eosio_assert(winnum == itr_user->betwin, "Win does not match.");
+
+    // update events. use metadata table to count the number of events
+    auto itr_metadata = metadatas.find(0);
+    uint32_t ratios[10] = {0, 1, 2, 3, 4, 5, 8, 20, 50, 250};
+    if (itr_user->wintype >= 1) {
+        events.emplace(_self, [&](auto &p){
+            p.id = events.available_primary_key();
+            p.owner = from;
+            p.datetime = now();
+            p.wintype = itr_user->wintype;
+            p.ratio = ratios[itr_user->wintype];
+            p.bet = itr_user->bet;
+            p.betwin = itr_user->betwin;
+            p.card1 = itr_user->card1;
+            p.card2 = itr_user->card2;
+            p.card3 = itr_user->card3;
+            p.card4 = itr_user->card4;
+            p.card5 = itr_user->card5;
+        });
+        eosio_assert(itr_metadata != metadatas.end(), "Metadata is empty.");
+        metadatas.modify(itr_metadata, _self, [&](auto &p){
+            p.eventcnt = p.eventcnt + 1;
+        });
+    }
+    if (itr_metadata->eventcnt > 32) {
+        auto itr_event2 = events.begin();
+        events.erase(itr_event2);
+        metadatas.modify(itr_metadata, _self, [&](auto &p){
+            p.eventcnt = p.eventcnt - 1;
+        });
+    }
+
+    uint64_t mineprice = getminingtableprice(itr_metadata->teosin);
+    uint64_t minemev = itr_user->bet * mineprice / 100;
+    uint64_t meosin = itr_user->bet;
+    uint64_t meosout = itr_user->betwin;
+
+    report(from, minemev, meosin, meosout);
 
     // clear balance
     asset bal = asset(itr_user->betwin, symbol_type(S(4, EOS)));
