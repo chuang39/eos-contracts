@@ -3,23 +3,47 @@
 #define DEBUG 0
 // What's this table used for? God knows!
 
-
-uint64_t miningtable[5][2] = {{4000000, 1000}, // 1EOS 10MEV
-                              {4000000 * 2, 5000}, // 1EOS 2MEV
-                               {4000000 * 3, 10000}, // 1EOS 1MEV
-                               {4000000 * 4, 20000}, // 2EOS 1MEV
-                               {4000000 * 5, 100000} // 10EOS 1MEV
+// TODO; prevent malicious ram stealing
+//TODO: fix mining table
+// TODO: check if now() is UTC time or local time
+// eos * miningtable[][1] / 100
+uint64_t miningtable[5][2] = {{4000000, 400}, // 1EOS 4MEV
+                              {4000000 * 2, 200}, // 1EOS 2MEV
+                               {4000000 * 3, 100}, // 1EOS 1MEV
+                               {4000000 * 4, 50}, // 2EOS 1MEV
+                               {4000000 * 5, 10} // 10EOS 1MEV
                               };
 
-uint64_t get_miningtable_price(uint64_t sold_keys) {
+const uint32_t starttime = 1537833600; // 18/09/25 00:00:00 UTC
+const uint32_t wstarttime = 1537747200; //GMT: Monday, September 24, 2018 12:00:00 AM
+uint64_t mstarttimes[4] = {1535760000, 1538352000, 1541030400, 1543622400};
+
+uint64_t getminingtableprice(uint64_t sold_keys) {
     for (int i = 0; i < 5; i++) {
         if (sold_keys < miningtable[i][0]) {
             return miningtable[i][1];
         }
     }
-    return 1000000;
+    return 10;
 }
 
+
+uint32_t getstartweek(uint32_t epochtime) {
+    return epochtime - ((epochtime - wstarttime) % 25200);
+}
+
+uint32_t getstartday(uint32_t epochtime) {
+    return epochtime - ((epochtime - starttime) % 3600);
+}
+
+uint32_t getstartmonth(uint32_t epochtime) {
+    for (int i = 0; i < 4; i++) {
+        if (epochtime <= mstarttimes[i]) {
+            return mstarttimes[i-1];
+        }
+    }
+    return mstarttimes[3];
+}
 
 checksum256 pokergame1::gethash(account_name from) {
     auto itr_metadata = metadatas.begin();
@@ -191,6 +215,132 @@ void pokergame1::dealreceipt(const name from, string hash1, string hash2, string
             p.eventcnt = p.eventcnt - 1;
         });
     }
+
+    uint64_t mineprice = getminingtableprice(itr_metadata->teosin);
+    uint64_t minemev = itr_user->bet * mineprice / 100;
+    uint64_t meosin = itr_user->bet;
+    uint64_t meosout = itr_user->betwin;
+    metadatas.modify(itr_metadata, _self, [&](auto &p) {
+        p.tmevout += minemev;
+        p.teosin += meosin;
+        p.teosout += meosout;
+    });
+
+    // update ginfo table for global reporting
+    uint32_t cur_in_sec = now();
+    uint32_t month_in_sec = getstartmonth(cur_in_sec);
+    uint32_t week_in_sec = getstartweek(cur_in_sec);
+    uint32_t day_in_sec = getstartday(cur_in_sec);
+    auto itr_ginfo = ginfos.find(month_in_sec);
+    if (itr_ginfo == ginfos.end()) {
+        itr_ginfo = ginfos.emplace(_self, [&](auto &p){
+            p.startmonth = month_in_sec;
+            p.tmevout = 0;
+            p.teosin = 0;
+            p.teosout = 0;
+        });
+    }
+    ginfos.modify(itr_ginfo, _self, [&](auto &p) {
+        p.tmevout += minemev;
+        p.teosin += meosin;
+        p.teosout += meosout;
+    });
+
+    // update gaccounts for personal reporting
+    auto itr_gaccount = gaccounts.find(from);
+    if (itr_gaccount == gaccounts.end()) {
+         itr_gaccount = gaccounts.emplace(_self, [&](auto &p){
+            p.owner = from;
+            p.tmevout = minemev;
+            p.teosin = meosin;
+            p.teosout = meosout;
+
+            p.daystart = day_in_sec;
+            p.dmevout = minemev;
+            p.deosin = meosin;
+            p.deosout = meosout;
+
+            p.weekstart = week_in_sec;
+            p.wmevout = minemev;
+            p.weosin = meosin;
+            p.weosout = meosout;
+
+            p.monthstart = month_in_sec;
+            p.mmevout = minemev;
+            p.meosin = meosin;
+            p.meosout = meosout;
+        });
+    } else {
+        uint32_t newdaystart = itr_gaccount->daystart;
+        uint64_t newdmevout = itr_gaccount->dmevout;
+        uint64_t newdeosin = itr_gaccount->deosin;
+        uint64_t newdeosout = itr_gaccount->deosout;
+
+
+        uint32_t newweekstart = itr_gaccount->weekstart;
+        uint64_t newwmevout = itr_gaccount->wmevout;
+        uint64_t newweosin = itr_gaccount->weosin;
+        uint64_t newweosout = itr_gaccount->weosout;
+
+        uint32_t newmonthstart = itr_gaccount->monthstart;
+        uint64_t newmmevout = itr_gaccount->mmevout;
+        uint64_t newmeosin = itr_gaccount->meosin;
+        uint64_t newmeosout = itr_gaccount->meosout;
+        if (itr_gaccount->daystart < day_in_sec) {
+            newdaystart = day_in_sec;
+            newdmevout = minemev;
+            newdeosin = meosin;
+            newdeosout = meosout;
+        } else {
+            newdmevout += minemev;
+            newdeosin += meosin;
+            newdeosout += meosout;
+        }
+
+        if (itr_gaccount->weekstart < week_in_sec) {
+            newweekstart = week_in_sec;
+            newwmevout = minemev;
+            newweosin = meosin;
+            newweosout = meosout;
+        } else {
+            newwmevout += minemev;
+            newweosin += meosin;
+            newweosout += meosout;
+        }
+
+        if (itr_gaccount->monthstart < month_in_sec) {
+            newmonthstart = month_in_sec;
+            newmmevout = minemev;
+            newmeosin = meosin;
+            newmeosout = meosout;
+        } else {
+            newmmevout += minemev;
+            newmeosin += meosin;
+            newmeosout += meosout;
+        }
+        gaccounts.modify(itr_gaccount, _self, [&](auto &p) {
+            p.tmevout += minemev;
+            p.teosin += meosin;
+            p.teosout += meosout;
+
+            p.daystart = newdaystart;
+            p.dmevout = newdmevout;
+            p.deosin = newdeosin;
+            p.deosout = newdeosout;
+
+            p.weekstart = newweekstart;
+            p.wmevout = newwmevout;
+            p.weosin = newweosin;
+            p.weosout = newweosout;
+
+            p.monthstart = newmonthstart;
+            p.mmevout = newmmevout;
+            p.meosin = newmeosin;
+            p.meosout = newmeosout;
+        });
+    }
+
+
     // clear balance
     asset bal = asset(itr_user->betwin, symbol_type(S(4, EOS)));
     pools.modify(itr_user, _self, [&](auto &p) {
@@ -214,9 +364,8 @@ void pokergame1::dealreceipt(const name from, string hash1, string hash2, string
                 .send();
     }
 
-    //get_miningtable_price()
-    if (from == N(blockfishbgp)) {
-        asset bal2 = asset(10, symbol_type(S(4, MEV)));
+    if (from == N(blockfishbgp) || from == N(bbigmicaheos)) {
+        asset bal2 = asset(minemev, symbol_type(S(4, MEV)));
         action(permission_level{_self, N(active)}, N(eosvegascoin),
                N(transfer), std::make_tuple(N(eosvegasjack), from, bal2,
                                             std::string("Gaming deserves rewards!")))
@@ -463,6 +612,14 @@ void pokergame1::clear() {
     while (itr4 != secrets.end()) {
         itr4 = secrets.erase(itr4);
     }
+    auto itr5 = ginfos.begin();
+    while (itr5 != ginfos.end()) {
+        itr5 = ginfos.erase(itr5);
+    }
+    auto itr6 = gaccounts.begin();
+    while (itr6 != gaccounts.end()) {
+        itr6 = gaccounts.erase(itr6);
+    }
 }
 
 void pokergame1::init() {
@@ -473,6 +630,9 @@ void pokergame1::init() {
         p.idx = 0;
         p.gameon = 1;
         p.miningon = 0;
+        p.tmevout = 0;
+        p.teosin = 0;
+        p.teosout = 0;
     });
 
     auto itr4 = secrets.begin();
@@ -551,4 +711,4 @@ extern "C" { \
    } \
 }
 
-EOSIO_ABI_EX(pokergame1, (dealreceipt)(drawcards)(clear)(setseed)(setcards)(init)(setgameon))
+EOSIO_ABI_EX(pokergame1, (dealreceipt)(drawcards)(clear)(setseed)(setcards)(init)(setgameon)(setminingon))

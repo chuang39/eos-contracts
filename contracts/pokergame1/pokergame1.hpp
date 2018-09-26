@@ -37,7 +37,9 @@ public:
              pools(_self, _self),
              events(_self, _self),
              metadatas(_self, _self),
-             secrets(_self, _self){};
+             secrets(_self, _self),
+             ginfos(_self, _self),
+             gaccounts(_self, _self){};
     //@abi action
     void dealreceipt(const name from, string hash1, string hash2, string card1, string card2, string card3, string card4, string card5, string betineos, string winineos, uint64_t betnum, uint64_t winnum);
     //@abi action
@@ -73,9 +75,12 @@ private:
         uint32_t idx;
         uint32_t gameon;
         uint32_t miningon;
+        uint64_t tmevout;
+        uint64_t teosin;
+        uint64_t teosout;
         uint64_t primary_key() const { return id; }
 
-        EOSLIB_SERIALIZE(st_metadatas, (id)(eventcnt)(idx)(gameon))
+        EOSLIB_SERIALIZE(st_metadatas, (id)(eventcnt)(idx)(gameon)(miningon)(tmevout)(teosin)(teosout))
     };
 
     // @abi table pools i64
@@ -125,6 +130,42 @@ private:
         EOSLIB_SERIALIZE(st_secrets, (id)(s1))
     };
 
+    // @abi table ginfos i64
+    struct st_ginfos {
+        uint32_t startmonth;
+        uint64_t tmevout;
+        uint64_t teosin;
+        uint64_t teosout;
+
+        uint64_t primary_key() const { return startmonth; }
+        EOSLIB_SERIALIZE(st_ginfos, (startmonth)(tmevout)(teosin)(teosout))
+    };
+
+    // @abi table gaccounts i64
+    struct st_gaccounts {
+        name owner;
+        uint64_t tmevout;
+        uint64_t teosin;
+        uint64_t teosout;
+        uint32_t daystart;
+        uint64_t dmevout;
+        uint64_t deosin;
+        uint64_t deosout;
+        uint32_t weekstart;
+        uint64_t wmevout;
+        uint64_t weosin;
+        uint64_t weosout;
+        uint32_t monthstart;
+        uint64_t mmevout;
+        uint64_t meosin;
+        uint64_t meosout;
+
+        uint64_t primary_key() const { return owner; }
+
+        EOSLIB_SERIALIZE(st_gaccounts, (owner)(tmevout)(teosin)(teosout)(daystart)(dmevout)(deosin)(deosout)(weekstart)(wmevout)(weosin)(weosout)(monthstart)(mmevout)(meosin)(meosout))
+    };
+
+
     typedef multi_index<N(metadatas), st_metadatas> _tb_metadatas;
     _tb_metadatas metadatas;
     typedef multi_index<N(pools), st_pools> _tb_pools;
@@ -133,4 +174,8 @@ private:
     _tb_events events;
     typedef multi_index<N(secrets), st_secrets> _tb_secrets;
     _tb_secrets secrets;
+    typedef multi_index<N(ginfos), st_ginfos> _tb_ginfos;
+    _tb_ginfos ginfos;
+    typedef multi_index<N(gaccounts), st_gaccounts> _tb_gaccounts;
+    _tb_gaccounts gaccounts;
 };
