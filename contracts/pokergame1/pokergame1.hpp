@@ -56,9 +56,11 @@ public:
     void setgameon(uint64_t id, uint32_t flag);
     //@abi action
     void setminingon(uint64_t id, uint32_t flag);
+    //@abi action
+    void signup(const name from);
     checksum256 gethash(account_name from);
     uint32_t getcard(account_name from, checksum256 result);
-    void deposit(const currency::transfer &t, account_name code);
+    void deposit(const currency::transfer &t, account_name code, uint32_t bettype);
     bool checkflush(uint32_t colors[5]);
     bool checkstraight(uint32_t numbers[5]);
     uint32_t checksame(uint32_t numbers[5], uint32_t threshold);
@@ -92,6 +94,7 @@ private:
         uint32_t card4;
         uint32_t card5;
         uint32_t wintype;
+        uint32_t betcurrency;
         uint64_t bet;
         uint64_t betwin;
         uint64_t userseed;
@@ -100,7 +103,7 @@ private:
 
         uint64_t primary_key() const { return owner; }
 
-        EOSLIB_SERIALIZE(st_pools, (owner)(card1)(card2)(card3)(card4)(card5)(wintype)(bet)(betwin)(userseed)(cardhash1)(cardhash2))
+        EOSLIB_SERIALIZE(st_pools, (owner)(card1)(card2)(card3)(card4)(card5)(wintype)(betcurrency)(bet)(betwin)(userseed)(cardhash1)(cardhash2))
     };
 
     // @abi table events i64

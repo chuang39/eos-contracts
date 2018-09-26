@@ -78,19 +78,48 @@ uint32_t pokergame1::getcard(account_name from, checksum256 result) {
 }
 
 
-void pokergame1::deposit(const currency::transfer &t, account_name code) {
+void pokergame1::signup(const name from) {
+    require_auth(from);
+    auto itr_user1 = pools.find(from);
+    eosio_assert(itr_user1 == pools.end(), "User is already signed up.");
+    asset bal2 = asset(1000000, symbol_type(S(4, MEV)));
+    action(permission_level{_self, N(active)}, N(eosvegascoin),
+           N(transfer), std::make_tuple(N(eosvegasjack), from, bal2,
+                                        std::string(name{from}.to_string() + ", welcome on board! 100 MEV is prepared as gift for your journey!")))
+            .send();
+
+    itr_user1 = pools.emplace(_self, [&](auto &p){
+        p.owner = name{from};
+        p.card1 = 0;
+        p.card2 = 0;
+        p.card3 = 0;
+        p.card4 = 0;
+        p.card5 = 0;
+        p.bet = 0;
+        p.betwin = 0;
+    });
+}
+
+void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_t bettype) {
     // run sanity check here
     if (code == _self) {
         return;
     }
-    eosio_assert(code == N(eosio.token), "Transfer not from eosio.token");
+    bool iseos = bettype == 0 ? true : false;
+
+    if (iseos) {
+        eosio_assert(code == N(eosio.token), "EOS should be sent by eosio.token");
+        eosio_assert(t.quantity.symbol == string_to_symbol(4, "EOS"), "Only accepts EOS/MEV for deposits.");
+    } else {
+        eosio_assert(code == N(eosvegascoin), "MEV should be sent by eosvegascoin.");
+        eosio_assert(t.quantity.symbol == string_to_symbol(4, "MEV"), "Only accepts MEV/EOS for deposits.");
+    }
     eosio_assert(t.to == _self, "Transfer not made to this contract");
-    eosio_assert(t.quantity.symbol == string_to_symbol(4, "EOS"), "Only accepts EOS for deposits");
     eosio_assert(t.quantity.is_valid(), "Invalid token transfer");
     eosio_assert(t.quantity.amount > 0, "Quantity must be positive");
     auto itr_metadata = metadatas.begin();
-    eosio_assert(itr_metadata != metadatas.end(), "No game found.");
-    eosio_assert(itr_metadata->gameon == 1, "Game is paused temporarily.");
+    eosio_assert(itr_metadata != metadatas.end(), "No game is found.");
+    eosio_assert(itr_metadata->gameon == 1, "Game is paused.");
 
     account_name user = t.from;
     auto amount = t.quantity.amount;
@@ -98,7 +127,6 @@ void pokergame1::deposit(const currency::transfer &t, account_name code) {
     // check if user exists or not
     auto itr_user1 = pools.find(user);
     if (itr_user1 == pools.end()) {
-        print(">>> add account: ", user);
         itr_user1 = pools.emplace(_self, [&](auto &p){
             p.owner = name{user};
             p.card1 = 0;
@@ -106,6 +134,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code) {
             p.card3 = 0;
             p.card4 = 0;
             p.card5 = 0;
+            p.betcurrency = bettype;
             p.bet = 0;
             p.betwin = 0;
         });
@@ -151,6 +180,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code) {
     }
     pools.modify(itr_user1, _self, [&](auto &p){
         p.bet = amount;
+        p.betcurrency = bettype;
         p.card1 = arr[0];
         p.card2 = arr[1];
         p.card3 = arr[2];
@@ -689,15 +719,22 @@ extern "C" { \
          /* onerror is only valid if it is for the "eosio" code account and authorized by "eosio"'s "active permission */ \
          eosio_assert(code == N(eosio), "onerror action's are only valid from the \"eosio\" system account"); \
       } \
-      if(code == self || code == N(eosio.token)) { \
-          TYPE thiscontract(self); \
+      if(code == self || code == N(eosio.token) || code == N(eosvegascoin)) { \
           if (action == N(transfer) && code == self) { \
+              return; \
+          } \
+          TYPE thiscontract(self); \
+          if (action == N(transfer) && code == N(eosvegascoin)) { \
+              currency::transfer tr = unpack_action_data<currency::transfer>(); \
+              if (tr.to == self) { \
+                  thiscontract.deposit(tr, code, 1); \
+              } \
               return; \
           } \
           if (action == N(transfer) && code == N(eosio.token)) { \
               currency::transfer tr = unpack_action_data<currency::transfer>(); \
               if (tr.to == self) { \
-                  thiscontract.deposit(tr, code); \
+                  thiscontract.deposit(tr, code, 0); \
               } \
               return; \
           } \
@@ -711,4 +748,4 @@ extern "C" { \
    } \
 }
 
-EOSIO_ABI_EX(pokergame1, (dealreceipt)(drawcards)(clear)(setseed)(setcards)(init)(setgameon)(setminingon))
+EOSIO_ABI_EX(pokergame1, (dealreceipt)(drawcards)(clear)(setseed)(setcards)(init)(setgameon)(setminingon)(signup))
