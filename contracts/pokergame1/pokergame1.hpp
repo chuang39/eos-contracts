@@ -48,8 +48,10 @@ public:
     void clear();
     //@abi action
     void init();
+    /*
     //@abi action
     void setcards(const name from, uint32_t c1, uint32_t c2, uint32_t c3, uint32_t c4, uint32_t c5);
+     */
     //@abi action
     void setseed(const name from, uint32_t seed);
     //@abi action

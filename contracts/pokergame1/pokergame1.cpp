@@ -744,6 +744,7 @@ void pokergame1::setseed(const name from, uint32_t seed) {
 
 }
 
+/*
 void pokergame1::setcards(const name from, uint32_t c1, uint32_t c2, uint32_t c3, uint32_t c4, uint32_t c5) {
     require_auth(_self);
     auto itr_user1 = pools.find(from);
@@ -755,6 +756,7 @@ void pokergame1::setcards(const name from, uint32_t c1, uint32_t c2, uint32_t c3
         p.card5 = c5;
     });
 }
+ */
 
 #define EOSIO_ABI_EX( TYPE, MEMBERS ) \
 extern "C" { \
@@ -793,4 +795,5 @@ extern "C" { \
    } \
 }
 
-EOSIO_ABI_EX(pokergame1, (dealreceipt)(drawcards)(clear)(setseed)(setcards)(init)(setgameon)(setminingon)(signup))
+//EOSIO_ABI_EX(pokergame1, (dealreceipt)(drawcards)(clear)(setseed)(setcards)(init)(setgameon)(setminingon)(signup))
+EOSIO_ABI_EX(pokergame1, (dealreceipt)(drawcards)(clear)(setseed)(init)(setgameon)(setminingon)(signup))
