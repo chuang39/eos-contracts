@@ -4,9 +4,9 @@
 // What's this table used for? God knows!
 
 // TODO; prevent malicious ram stealing
-//TODO: fix mining table
-// TODO: check if now() is UTC time or local time
-// eos * miningtable[][1] / 100
+// TODO: fix mining table
+
+// (# of mev) = (# of eos) * miningtable[][1] / 100
 uint64_t miningtable[5][2] = {{4000000, 400}, // 1EOS 4MEV
                               {4000000 * 2, 200}, // 1EOS 2MEV
                                {4000000 * 3, 100}, // 1EOS 1MEV
@@ -27,13 +27,12 @@ uint64_t getminingtableprice(uint64_t sold_keys) {
     return 10;
 }
 
-
 uint32_t getstartweek(uint32_t epochtime) {
-    return epochtime - ((epochtime - wstarttime) % 25200);
+    return epochtime - ((epochtime - wstarttime) % 604800);
 }
 
 uint32_t getstartday(uint32_t epochtime) {
-    return epochtime - ((epochtime - starttime) % 3600);
+    return epochtime - ((epochtime - starttime) % 86400);
 }
 
 uint32_t getstartmonth(uint32_t epochtime) {
@@ -77,8 +76,7 @@ uint32_t pokergame1::getcard(account_name from, checksum256 result) {
     return res;
 }
 
-
-void pokergame1::signup(const name from) {
+void pokergame1::signup(const name from, const string memo) {
     require_auth(from);
     auto itr_user1 = pools.find(from);
     eosio_assert(itr_user1 == pools.end(), "User is already signed up.");
@@ -97,6 +95,7 @@ void pokergame1::signup(const name from) {
 
     itr_user1 = pools.emplace(_self, [&](auto &p){
         p.owner = name{from};
+        p.status = 0;
         p.card1 = 0;
         p.card2 = 0;
         p.card3 = 0;
@@ -113,6 +112,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         return;
     }
     bool iseos = bettype == 0 ? true : false;
+    eosio_assert(iseos, "Only support EOS sent by eosio.token now.");
 
     if (iseos) {
         eosio_assert(code == N(eosio.token), "EOS should be sent by eosio.token");
@@ -129,6 +129,10 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
     eosio_assert(itr_metadata->gameon == 1, "Game is paused.");
 
     account_name user = t.from;
+    // No bet from eosvegascoin
+    if (user == N(eosvegascoin)) {
+        return;
+    }
     auto amount = t.quantity.amount;
 
     // check if user exists or not
@@ -136,6 +140,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
     if (itr_user1 == pools.end()) {
         itr_user1 = pools.emplace(_self, [&](auto &p){
             p.owner = name{user};
+            p.status = 0;
             p.card1 = 0;
             p.card2 = 0;
             p.card3 = 0;
@@ -174,6 +179,16 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
             sha256((char *)&lasthash.hash, 32, &newhash);
             lasthash = newhash;
             continue;
+        } else if (cnt == 1) {
+            uint32_t basecolor = num / 13;
+            if (((arr[0]/13) != basecolor || (arr[1]/13) != basecolor || (arr[2]/13) != basecolor || (arr[3]/13) != basecolor) == false) {
+                if (arr[1] > arr[3]) {
+                    checksum256 newhash;
+                    sha256((char *)&lasthash.hash, 32, &newhash);
+                    lasthash = newhash;
+                    continue;
+                }
+            }
         }
 #ifdef DEBUG
         print(">>> draw", num);
@@ -197,11 +212,13 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
     });
 }
 
-void report(account_name from, uint64_t minemev, uint64_t meosin, uint64_t meosout) {
+void pokergame1::report(name from, uint64_t minemev, uint64_t meosin, uint64_t meosout) {
+    auto itr_metadata = metadatas.find(0);
     metadatas.modify(itr_metadata, _self, [&](auto &p) {
         p.tmevout += minemev;
         p.teosin += meosin;
         p.teosout += meosout;
+        p.trounds += 1;
     });
 
     // update ginfo table for global reporting
@@ -232,47 +249,55 @@ void report(account_name from, uint64_t minemev, uint64_t meosin, uint64_t meoso
             p.tmevout = minemev;
             p.teosin = meosin;
             p.teosout = meosout;
+            p.trounds = 1;
 
             p.daystart = day_in_sec;
             p.dmevout = minemev;
             p.deosin = meosin;
             p.deosout = meosout;
+            p.drounds = 1;
 
             p.weekstart = week_in_sec;
             p.wmevout = minemev;
             p.weosin = meosin;
             p.weosout = meosout;
+            p.wrounds = 1;
 
             p.monthstart = month_in_sec;
             p.mmevout = minemev;
             p.meosin = meosin;
             p.meosout = meosout;
+            p.mrounds = 1;
         });
     } else {
         uint32_t newdaystart = itr_gaccount->daystart;
         uint64_t newdmevout = itr_gaccount->dmevout;
         uint64_t newdeosin = itr_gaccount->deosin;
         uint64_t newdeosout = itr_gaccount->deosout;
-
+        uint64_t newdrounds = itr_gaccount->drounds;
 
         uint32_t newweekstart = itr_gaccount->weekstart;
         uint64_t newwmevout = itr_gaccount->wmevout;
         uint64_t newweosin = itr_gaccount->weosin;
         uint64_t newweosout = itr_gaccount->weosout;
+        uint64_t newwrounds = itr_gaccount->wrounds;
 
         uint32_t newmonthstart = itr_gaccount->monthstart;
         uint64_t newmmevout = itr_gaccount->mmevout;
         uint64_t newmeosin = itr_gaccount->meosin;
         uint64_t newmeosout = itr_gaccount->meosout;
+        uint64_t newmrounds = itr_gaccount->mrounds;
         if (itr_gaccount->daystart < day_in_sec) {
             newdaystart = day_in_sec;
             newdmevout = minemev;
             newdeosin = meosin;
             newdeosout = meosout;
+            newdrounds = 1;
         } else {
             newdmevout += minemev;
             newdeosin += meosin;
             newdeosout += meosout;
+            newdrounds += 1;
         }
 
         if (itr_gaccount->weekstart < week_in_sec) {
@@ -280,10 +305,12 @@ void report(account_name from, uint64_t minemev, uint64_t meosin, uint64_t meoso
             newwmevout = minemev;
             newweosin = meosin;
             newweosout = meosout;
+            newwrounds = 1;
         } else {
             newwmevout += minemev;
             newweosin += meosin;
             newweosout += meosout;
+            newwrounds += 1;
         }
 
         if (itr_gaccount->monthstart < month_in_sec) {
@@ -291,34 +318,39 @@ void report(account_name from, uint64_t minemev, uint64_t meosin, uint64_t meoso
             newmmevout = minemev;
             newmeosin = meosin;
             newmeosout = meosout;
+            newmrounds = 1;
         } else {
             newmmevout += minemev;
             newmeosin += meosin;
             newmeosout += meosout;
+            newmrounds += 1;
         }
         gaccounts.modify(itr_gaccount, _self, [&](auto &p) {
             p.tmevout += minemev;
             p.teosin += meosin;
             p.teosout += meosout;
+            p.trounds += 1;
 
             p.daystart = newdaystart;
             p.dmevout = newdmevout;
             p.deosin = newdeosin;
             p.deosout = newdeosout;
+            p.drounds = newdrounds;
 
             p.weekstart = newweekstart;
             p.wmevout = newwmevout;
             p.weosin = newweosin;
             p.weosout = newweosout;
+            p.wrounds = newwrounds;
 
             p.monthstart = newmonthstart;
             p.mmevout = newmmevout;
             p.meosin = newmeosin;
             p.meosout = newmeosout;
+            p.mrounds = newmrounds;
         });
     }
 }
-
 
 void pokergame1::dealreceipt(const name from, string hash1, string hash2, string card1, string card2, string card3, string card4, string card5, string betineos, string winineos, uint64_t betnum, uint64_t winnum) {
 
@@ -347,8 +379,9 @@ void pokergame1::dealreceipt(const name from, string hash1, string hash2, string
 
     // update events. use metadata table to count the number of events
     auto itr_metadata = metadatas.find(0);
-    uint32_t ratios[10] = {0, 1, 2, 3, 4, 5, 8, 20, 50, 250};
-    if (itr_user->wintype >= 1) {
+    uint32_t ratios[10] = {0, 1, 2, 3, 4, 5, 8, 25, 50, 250};
+    // records events if wintype >= straight
+    if (itr_user->wintype >= 4) {
         events.emplace(_self, [&](auto &p){
             p.id = events.available_primary_key();
             p.owner = from;
@@ -498,10 +531,8 @@ void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, 
         p.cardhash2 = string(rhash);
     });
 
-
     // check if the player wins or not
     uint32_t ratio[10] = {0, 1, 2, 3, 4, 5, 8, 20, 50, 250};
-
 
     uint32_t cards[5];
     uint32_t colors[5];
@@ -675,6 +706,7 @@ void pokergame1::init() {
         p.tmevout = 0;
         p.teosin = 0;
         p.teosout = 0;
+        p.trounds = 0;
     });
 
     auto itr4 = secrets.begin();
@@ -708,7 +740,8 @@ void pokergame1::setminingon(uint64_t id, uint32_t flag) {
 }
 
 void pokergame1::setseed(const name from, uint32_t seed) {
-    int32_t ram_bytes = action_data_size();
+    require_auth(_self);
+
 }
 
 void pokergame1::setcards(const name from, uint32_t c1, uint32_t c2, uint32_t c3, uint32_t c4, uint32_t c5) {

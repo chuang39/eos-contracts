@@ -57,7 +57,7 @@ public:
     //@abi action
     void setminingon(uint64_t id, uint32_t flag);
     //@abi action
-    void signup(const name from);
+    void signup(const name from, const string memo);
     checksum256 gethash(account_name from);
     uint32_t getcard(account_name from, checksum256 result);
     void deposit(const currency::transfer &t, account_name code, uint32_t bettype);
@@ -67,6 +67,7 @@ public:
     bool ishold(string s);
     bool checkBiggerJack(uint32_t numbers[5]);
     uint32_t parsecard(string s);
+    void report(name from, uint64_t minemev, uint64_t meosin, uint64_t meosout);
 
 private:
     // 0: jacks or better
@@ -80,14 +81,16 @@ private:
         uint64_t tmevout;
         uint64_t teosin;
         uint64_t teosout;
+        uint64_t trounds;
         uint64_t primary_key() const { return id; }
 
-        EOSLIB_SERIALIZE(st_metadatas, (id)(eventcnt)(idx)(gameon)(miningon)(tmevout)(teosin)(teosout))
+        EOSLIB_SERIALIZE(st_metadatas, (id)(eventcnt)(idx)(gameon)(miningon)(tmevout)(teosin)(teosout)(trounds))
     };
 
     // @abi table pools i64
     struct st_pools {
         name owner;
+        uint32_t status;
         uint32_t card1;
         uint32_t card2;
         uint32_t card3;
@@ -103,7 +106,7 @@ private:
 
         uint64_t primary_key() const { return owner; }
 
-        EOSLIB_SERIALIZE(st_pools, (owner)(card1)(card2)(card3)(card4)(card5)(wintype)(betcurrency)(bet)(betwin)(userseed)(cardhash1)(cardhash2))
+        EOSLIB_SERIALIZE(st_pools, (owner)(status)(card1)(card2)(card3)(card4)(card5)(wintype)(betcurrency)(bet)(betwin)(userseed)(cardhash1)(cardhash2))
     };
 
     // @abi table events i64
@@ -147,25 +150,29 @@ private:
     // @abi table gaccounts i64
     struct st_gaccounts {
         name owner;
+        uint64_t trounds;
         uint64_t tmevout;
         uint64_t teosin;
         uint64_t teosout;
         uint32_t daystart;
+        uint64_t drounds;
         uint64_t dmevout;
         uint64_t deosin;
         uint64_t deosout;
         uint32_t weekstart;
+        uint64_t wrounds;
         uint64_t wmevout;
         uint64_t weosin;
         uint64_t weosout;
         uint32_t monthstart;
+        uint64_t mrounds;
         uint64_t mmevout;
         uint64_t meosin;
         uint64_t meosout;
 
         uint64_t primary_key() const { return owner; }
 
-        EOSLIB_SERIALIZE(st_gaccounts, (owner)(tmevout)(teosin)(teosout)(daystart)(dmevout)(deosin)(deosout)(weekstart)(wmevout)(weosin)(weosout)(monthstart)(mmevout)(meosin)(meosout))
+        EOSLIB_SERIALIZE(st_gaccounts, (owner)(trounds)(tmevout)(teosin)(teosout)(daystart)(drounds)(dmevout)(deosin)(deosout)(weekstart)(wrounds)(wmevout)(weosin)(weosout)(monthstart)(mrounds)(mmevout)(meosin)(meosout))
     };
 
 
