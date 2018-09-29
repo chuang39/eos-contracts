@@ -1,5 +1,18 @@
 #include "mev.hpp"
 
+
+uint64_t mstarttimes[4] = {1535760000, 1538352000, 1541030400, 1543622400};
+
+
+uint32_t getstartmonth(uint32_t epochtime) {
+    for (int i = 0; i < 4; i++) {
+        if (epochtime <= mstarttimes[i]) {
+            return mstarttimes[i-1];
+        }
+    }
+    return mstarttimes[3];
+}
+
 void mev::create( account_name issuer,
                     asset        maximum_supply )
 {
@@ -83,9 +96,12 @@ void mev::sub_balance( account_name owner, asset value ) {
    const auto& from = from_acnts.get( value.symbol.name(), "no balance object found" );
    eosio_assert( from.balance.amount >= value.amount, "overdrawn balance!" );
 
-
    if( from.balance.amount == value.amount ) {
       from_acnts.erase( from );
+      auto itr_holder = holders.find(owner);
+      if (itr_holder != holders.end()) {
+          holders.erase(itr_holder);
+      }
    } else {
       from_acnts.modify( from, owner, [&]( auto& a ) {
           a.balance -= value;
@@ -101,6 +117,14 @@ void mev::add_balance( account_name owner, asset value, account_name ram_payer )
       to_acnts.emplace( ram_payer, [&]( auto& a ){
         a.balance = value;
       });
+
+      auto itr_holder = holders.find(owner);
+      if (itr_holder == holders.end()) {
+          holders.emplace(_self, [&](auto &p){
+              p.owner = owner;
+          });
+      }
+
    } else {
       to_acnts.modify( to, 0, [&]( auto& a ) {
         a.balance += value;
@@ -126,30 +150,77 @@ void mev::registerbb(account_name from, asset quantity) {
     require_auth( from );
     asset tempasset = asset(0, symbol_type(S(4, MEV)));
     stats statstable( _self, tempasset.symbol.name() );
-    const auto& st = statstable.get( sym );
+    const auto& st = statstable.get( tempasset.symbol.name() );
 
-    eosio_assert( quantity.is_valid(), "invalid quantity" );
-    eosio_assert( quantity.amount > 0, "must transfer positive quantity" );
-    eosio_assert( quantity.symbol == st.supply.symbol, "symbol precision mismatch" );
-    //eosio_assert( memo.size() <= 256, "memo has more than 256 bytes" );
+    eosio_assert( quantity.symbol.name() == tempasset.symbol.name(), "Symbol must be MEV" );
+    eosio_assert( quantity.is_valid(), "Invalid quantity" );
+    eosio_assert( quantity.amount > 0, "Must transfer positive quantity" );
+    eosio_assert( quantity.symbol == st.supply.symbol, "Symbol precision mismatch" );
+
+    auto amount = quantity.amount;
+    uint32_t cur_in_sec = now();
+    uint32_t month_in_sec = getstartmonth(cur_in_sec);
+    auto itr_rewardinfo = rewardinfos.find(month_in_sec);
+    eosio_assert( itr_rewardinfo != rewardinfos.end(), "Repurchase window is not open yet for this month.");
+    eosio_assert( cur_in_sec < itr_rewardinfo->expireat , "Repurchase window is closed for this month.");
+    rewardinfos.modify( itr_rewardinfo, 0, [&]( auto& p ) {
+        p.buybackshares += amount;
+    });
 
     sub_balance( from, quantity );
     add_balance( N(eosvegascoin), quantity, st.issuer );
 
     auto itr_buyback = buybackregs.find(from);
-    eosio_assert( itr_buyback == buybackregs.end(), "Your last buyback is not finished." );
+    eosio_assert( itr_buyback == buybackregs.end(), "You have registered buyback for this month." );
     itr_buyback = buybackregs.emplace(_self, [&](auto &p){
-        p.id = buybackregs.available_primary_key();
         p.owner = from;
         p.shares = quantity;
     });
 }
 
-void mev::paydividend(const currency::transfer &t, account_name code) {
+void mev::cancelreward(account_name from) {
+    if (from != N(eosvegasjack) || from != _self) {
+        eosio_assert( false, "You don't have privilege to cancel reward." );
 
+    }
+
+    require_auth( _self );
+}
+
+void mev::rewardholders(const currency::transfer &t, account_name code) {
+    // memo should be like "time"
+
+    if (t.from != N(eosvegasjack)) {
+        return;
+    }
+    eosio_assert(t.quantity.symbol == string_to_symbol(4, "EOS"), "Only accepts EOS/MEV for deposits.");
+    eosio_assert(t.to == _self, "Transfer not made to this contract");
+    eosio_assert(t.quantity.is_valid(), "Invalid token transfer");
+    eosio_assert(t.quantity.amount > 0, "Quantity must be positive");
+
+    auto amount = t.quantity.amount;
+    string usercomment = t.memo;
+    string ucm = usercomment.substr(0, 10);
+    uint32_t startmonth = stoi(ucm);
+    auto itr_rewardinfo = rewardinfos.find(startmonth);
+
+    uint64_t bbshares = 0;
+    uint64_t bbprice = 0;
+    if (amount > itr_rewardinfo->buybackshares) {
+
+    }
+    // buyback
 
 
 }
+
+void addreward(uint32_t month, uint32_t status) {
+}
+
+void removereward(uint32_t month) {
+
+}
+
 
 #define EOSIO_ABI_EX( TYPE, MEMBERS ) \
 extern "C" { \
@@ -164,7 +235,7 @@ extern "C" { \
          if (action == N(transfer) && code == N(eosio.token)) { \
               currency::transfer tr = unpack_action_data<currency::transfer>(); \
               if (tr.to == self) { \
-                  thiscontract.paydividend(tr, code); \
+                  thiscontract.rewardholders(tr, code); \
               } \
               return; \
          } \
@@ -178,4 +249,4 @@ extern "C" { \
    } \
 }
 
-EOSIO_ABI_EX( mev, (create)(issue)(transfer)(debug)(registerbb)(paydividend) )
+EOSIO_ABI_EX( mev, (create)(issue)(transfer)(debug)(registerbb)(rewardholders) )
