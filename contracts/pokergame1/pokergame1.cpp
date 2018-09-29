@@ -178,7 +178,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
             sha256((char *)&lasthash.hash, 32, &newhash);
             lasthash = newhash;
             continue;
-        } else if (cnt == 1) {
+        } else if (cnt == 1 && amount >= 40000) {
             uint32_t basecolor = num / 13;
             if (((arr[0]/13) != basecolor || (arr[1]/13) != basecolor || (arr[2]/13) != basecolor || (arr[3]/13) != basecolor) == false) {
                 if (arr[1] > arr[3]) {
@@ -209,6 +209,14 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         p.card5 = arr[4];
         p.cardhash1 = rhash;
     });
+
+    for (int i = 0; i < 5; i++) {
+        auto itr_cardstat = cardstats.find(arr[i]);
+        eosio_assert(itr_cardstat != cardstats.end(), "Cannot find the card in card statistic table.");
+        cardstats.modify(itr_cardstat, _self, [&](auto &p) {
+            p.count += 1;
+        });
+    }
 }
 
 void pokergame1::report(name from, uint64_t minemev, uint64_t meosin, uint64_t meosout) {
@@ -414,6 +422,10 @@ void pokergame1::dealreceipt(const name from, string hash1, string hash2, string
     uint64_t meosout = itr_user->betwin;
 
     report(from, minemev, meosin, meosout);
+    auto itr_typestat = typestats.find(itr_user->wintype);
+    typestats.modify(itr_typestat, _self, [&](auto &p) {
+        p.count += 1;
+    });
 
     // clear balance
     asset bal = asset(itr_user->betwin, symbol_type(S(4, EOS)));
@@ -462,6 +474,7 @@ void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, 
     eosio_assert(parsecard(dump5) == itr_user->card5, "card5 mismatch");
     uint32_t cnt = 5;
     uint32_t arr[5];
+    bool barr[5];
     std::set<uint32_t> myset;
     myset.insert(itr_user->card1);
     myset.insert(itr_user->card2);
@@ -479,8 +492,19 @@ void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, 
         rhash += hex_chars[ ( byte & 0x0F ) >> 0 ];
     }
 
+    barr[0] = ishold(dump1) == true;
+    barr[1] = ishold(dump2) == true;
+    barr[2] = ishold(dump3) == true;
+    barr[3] = ishold(dump4) == true;
+    barr[4] = ishold(dump5) == true;
+
     checksum256 lasthash = roothash;
     while (cnt > 0) {
+        if (barr[5-cnt] == true) {
+            cnt--;
+            continue;
+        }
+
         uint32_t num = getcard(from, lasthash);
         if (myset.find(num) != myset.end()) {
             checksum256 newhash;
@@ -488,38 +512,42 @@ void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, 
             lasthash = newhash;
             continue;
         }
-#ifdef DEBUG
-        print(">>> draw", num);
-#endif
         myset.insert(num);
         arr[5-cnt] = num;
         cnt--;
         checksum256 newhash;
         sha256((char *)&lasthash.hash, 32, &newhash);
         lasthash = newhash;
+
+        // update cardstat here for new drawn card
+        auto itr_cardstat = cardstats.find(num);
+        eosio_assert(itr_cardstat != cardstats.end(), "Cannot find the card in card statistic table.");
+        cardstats.modify(itr_cardstat, _self, [&](auto &p) {
+            p.count += 1;
+        });
     }
 
-    if (ishold(dump1) == false) {
+    if (barr[0] == false) {
         pools.modify(itr_user, _self, [&](auto &p){
             p.card1 = arr[0];
         });
     }
-    if (ishold(dump2) == false) {
+    if (barr[1] == false) {
         pools.modify(itr_user, _self, [&](auto &p){
             p.card2 = arr[1];
         });
     }
-    if (ishold(dump3) == false) {
+    if (barr[2] == false) {
         pools.modify(itr_user, _self, [&](auto &p){
             p.card3 = arr[2];
         });
     }
-    if (ishold(dump4) == false) {
+    if (barr[3] == false) {
         pools.modify(itr_user, _self, [&](auto &p){
             p.card4 = arr[3];
         });
     }
-    if (ishold(dump5) == false) {
+    if (barr[4] == false) {
         pools.modify(itr_user, _self, [&](auto &p){
             p.card5 = arr[4];
         });
@@ -690,10 +718,20 @@ void pokergame1::clear() {
     while (itr6 != gaccounts.end()) {
         itr6 = gaccounts.erase(itr6);
     }
+
+    auto itr7 = cardstats.begin();
+    while (itr7 != cardstats.end()) {
+        itr7 = cardstats.erase(itr7);
+    }
+    auto itr8 = typestats.begin();
+    while (itr8 != typestats.end()) {
+        itr8 = typestats.erase(itr8);
+    }
 }
 
 void pokergame1::init() {
     require_auth(_self);
+
     auto itr3 = metadatas.begin();
     auto itr_metadata = metadatas.emplace(_self, [&](auto &p){
         p.eventcnt = 0;
@@ -712,6 +750,22 @@ void pokergame1::init() {
         secrets.emplace(_self, [&](auto &p) {
             p.id = i;
             p.s1 = current_time() + bnum + 7 * i;
+        });
+    }
+
+    auto itr5 = cardstats.begin();
+    for( int i = 0; i < 52; ++i ) {
+        cardstats.emplace(_self, [&](auto &p) {
+            p.id = i;
+            p.count = 0;
+        });
+    }
+
+    auto itr6 = typestats.begin();
+    for( int i = 0; i < 10; ++i ) {
+        typestats.emplace(_self, [&](auto &p) {
+            p.id = i;
+            p.count = 0;
         });
     }
 }

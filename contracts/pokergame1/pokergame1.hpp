@@ -39,7 +39,10 @@ public:
              metadatas(_self, _self),
              secrets(_self, _self),
              ginfos(_self, _self),
-             gaccounts(_self, _self){};
+             gaccounts(_self, _self),
+             cardstats(_self, _self),
+             typestats(_self, _self){};
+
     //@abi action
     void dealreceipt(const name from, string hash1, string hash2, string card1, string card2, string card3, string card4, string card5, string betineos, string winineos, uint64_t betnum, uint64_t winnum);
     //@abi action
@@ -177,6 +180,21 @@ private:
         EOSLIB_SERIALIZE(st_gaccounts, (owner)(trounds)(tmevout)(teosin)(teosout)(daystart)(drounds)(dmevout)(deosin)(deosout)(weekstart)(wrounds)(wmevout)(weosin)(weosout)(monthstart)(mrounds)(mmevout)(meosin)(meosout))
     };
 
+    // @abi table cardstats i64
+    struct st_cardstats {
+        uint64_t id;
+        uint64_t count;
+        uint64_t primary_key() const { return id; }
+        EOSLIB_SERIALIZE(st_cardstats, (id)(count))
+    };
+
+    // @abi table typestats i64
+    struct st_typestats {
+        uint64_t id;
+        uint64_t count;
+        uint64_t primary_key() const { return id; }
+        EOSLIB_SERIALIZE(st_typestats, (id)(count))
+    };
 
     typedef multi_index<N(metadatas), st_metadatas> _tb_metadatas;
     _tb_metadatas metadatas;
@@ -190,4 +208,8 @@ private:
     _tb_ginfos ginfos;
     typedef multi_index<N(gaccounts), st_gaccounts> _tb_gaccounts;
     _tb_gaccounts gaccounts;
+    typedef multi_index<N(cardstats), st_cardstats> _tb_cardstats;
+    _tb_cardstats cardstats;
+    typedef multi_index<N(typestats), st_typestats> _tb_typestats;
+    _tb_typestats typestats;
 };
