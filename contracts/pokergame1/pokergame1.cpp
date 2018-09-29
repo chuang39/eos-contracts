@@ -4,7 +4,6 @@
 // What's this table used for? God knows!
 
 // TODO; prevent malicious ram stealing
-// TODO: fix mining table
 
 // (# of mev) = (# of eos) * miningtable[][1] / 100
 uint64_t miningtable[5][2] = {{4000000, 400}, // 1EOS 4MEV
@@ -24,7 +23,7 @@ uint64_t getminingtableprice(uint64_t sold_keys) {
             return miningtable[i][1];
         }
     }
-    return 10;
+    return 5;
 }
 
 uint32_t getstartweek(uint32_t epochtime) {
@@ -500,8 +499,6 @@ void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, 
         lasthash = newhash;
     }
 
-    // TODO: check cards
-
     if (ishold(dump1) == false) {
         pools.modify(itr_user, _self, [&](auto &p){
             p.card1 = arr[0];
@@ -532,7 +529,7 @@ void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, 
     });
 
     // check if the player wins or not
-    uint32_t ratio[10] = {0, 1, 2, 3, 4, 5, 8, 20, 50, 250};
+    uint32_t ratio[10] = {0, 1, 2, 3, 4, 5, 8, 25, 50, 250};
 
     uint32_t cards[5];
     uint32_t colors[5];
