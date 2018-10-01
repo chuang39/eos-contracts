@@ -15,7 +15,7 @@ uint64_t miningtable[5][2] = {{4000000, 400}, // 1EOS 4MEV
 
 const uint32_t starttime = 1537833600; // 18/09/25 00:00:00 UTC
 const uint32_t wstarttime = 1537747200; //GMT: Monday, September 24, 2018 12:00:00 AM
-uint64_t mstarttimes[4] = {1535760000, 1538352000, 1541030400, 1543622400};
+uint64_t mstarttimes[5] = {1535760000, 1538352000, 1541030400, 1543622400, 1546300800};
 
 uint64_t getminingtableprice(uint64_t sold_keys) {
     for (int i = 0; i < 5; i++) {
@@ -35,12 +35,12 @@ uint32_t getstartday(uint32_t epochtime) {
 }
 
 uint32_t getstartmonth(uint32_t epochtime) {
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 5; i++) {
         if (epochtime <= mstarttimes[i]) {
             return mstarttimes[i-1];
         }
     }
-    return mstarttimes[3];
+    return mstarttimes[4];
 }
 
 checksum256 pokergame1::gethash(account_name from) {
@@ -69,9 +69,7 @@ uint32_t pokergame1::getcard(account_name from, checksum256 result) {
     seed |= result.hash[0];
 
     uint32_t res = (uint32_t)(seed % 52);
-#ifdef DEBUG
-    print(">>> return card: ", res);
-#endif
+
     return res;
 }
 
@@ -152,7 +150,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
     }
 
     // check if the pool ends or not
-    eosio_assert(itr_user1->bet == 0, "Previous round does not end.");
+    // eosio_assert(itr_user1->bet == 0, "Previous round does not end.");
 
     // start a new round
     // deposit money and draw 5 cards
@@ -208,8 +206,12 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         p.card4 = arr[3];
         p.card5 = arr[4];
         p.cardhash1 = rhash;
+        p.cardhash2 = "";
+        p.betwin = 0;
+        p.wintype = 0;
     });
 
+    // reporting
     for (int i = 0; i < 5; i++) {
         auto itr_cardstat = cardstats.find(arr[i]);
         eosio_assert(itr_cardstat != cardstats.end(), "Cannot find the card in card statistic table.");
@@ -360,103 +362,8 @@ void pokergame1::report(name from, uint64_t minemev, uint64_t meosin, uint64_t m
 }
 
 void pokergame1::dealreceipt(const name from, string hash1, string hash2, string card1, string card2, string card3, string card4, string card5, string betineos, string winineos, uint64_t betnum, uint64_t winnum) {
-
-    uint32_t c1 = parsecard(card1);
-    eosio_assert(c1 < 52, "card1 larger than 51");
-    uint32_t c2 = parsecard(card2);
-    eosio_assert(c2 < 52, "card2 larger than 51");
-    uint32_t c3 = parsecard(card3);
-    eosio_assert(c3 < 52, "card3 larger than 51");
-    uint32_t c4 = parsecard(card4);
-    eosio_assert(c4 < 52, "card4 larger than 51");
-    uint32_t c5 = parsecard(card5);
-    eosio_assert(c5 < 52, "card5 larger than 51");
-
-    auto itr_user = pools.find(from);
-    eosio_assert(c1 == itr_user->card1, "card1 is not valid");
-    eosio_assert(c2 == itr_user->card2, "card2 is not valid");
-    eosio_assert(c3 == itr_user->card3, "card3 is not valid");
-    eosio_assert(c4 == itr_user->card4, "card4 is not valid");
-    eosio_assert(c5 == itr_user->card5, "card5 is not valid");
-    eosio_assert(hash1 == itr_user->cardhash1, "cardhash1 is not valid");
-    eosio_assert(hash2 == itr_user->cardhash2, "cardhash2 is not valid");
-    eosio_assert(itr_user->bet > 0, "bet must be larger than zero");
-    eosio_assert(betnum == itr_user->bet, "Bet does not match.");
-    eosio_assert(winnum == itr_user->betwin, "Win does not match.");
-
-    // update events. use metadata table to count the number of events
-    auto itr_metadata = metadatas.find(0);
-    uint32_t ratios[10] = {0, 1, 2, 3, 4, 5, 8, 25, 50, 250};
-    // records events if wintype >= straight
-    if (itr_user->wintype >= 4) {
-        events.emplace(_self, [&](auto &p){
-            p.id = events.available_primary_key();
-            p.owner = from;
-            p.datetime = now();
-            p.wintype = itr_user->wintype;
-            p.ratio = ratios[itr_user->wintype];
-            p.bet = itr_user->bet;
-            p.betwin = itr_user->betwin;
-            p.card1 = itr_user->card1;
-            p.card2 = itr_user->card2;
-            p.card3 = itr_user->card3;
-            p.card4 = itr_user->card4;
-            p.card5 = itr_user->card5;
-        });
-        eosio_assert(itr_metadata != metadatas.end(), "Metadata is empty.");
-        metadatas.modify(itr_metadata, _self, [&](auto &p){
-            p.eventcnt = p.eventcnt + 1;
-        });
-    }
-    if (itr_metadata->eventcnt > 32) {
-        auto itr_event2 = events.begin();
-        events.erase(itr_event2);
-        metadatas.modify(itr_metadata, _self, [&](auto &p){
-            p.eventcnt = p.eventcnt - 1;
-        });
-    }
-
-    uint64_t mineprice = getminingtableprice(itr_metadata->teosin);
-    uint64_t minemev = itr_user->bet * mineprice / 100;
-    uint64_t meosin = itr_user->bet;
-    uint64_t meosout = itr_user->betwin;
-
-    report(from, minemev, meosin, meosout);
-    auto itr_typestat = typestats.find(itr_user->wintype);
-    typestats.modify(itr_typestat, _self, [&](auto &p) {
-        p.count += 1;
-    });
-
-    // clear balance
-    asset bal = asset(itr_user->betwin, symbol_type(S(4, EOS)));
-    pools.modify(itr_user, _self, [&](auto &p) {
-        p.cardhash1 = "";
-        p.cardhash2 = "";
-        p.bet = 0;
-        p.betwin = 0;
-        p.wintype = 0;
-        p.card1 = 0;
-        p.card2 = 0;
-        p.card3 = 0;
-        p.card4 = 0;
-        p.card5 = 0;
-    });
-
-    if (bal.amount > 0) {
-        // withdraw
-        action(permission_level{_self, N(active)}, N(eosio.token),
-               N(transfer), std::make_tuple(_self, from, bal,
-                                            std::string("Winner winner chicken dinner!")))
-                .send();
-    }
-
-    if (from == N(blockfishbgp) || from == N(bbigmicaheos)) {
-        asset bal2 = asset(minemev, symbol_type(S(4, MEV)));
-        action(permission_level{_self, N(active)}, N(eosvegascoin),
-               N(transfer), std::make_tuple(N(eosvegasjack), from, bal2,
-                                            std::string("Gaming deserves rewards!")))
-                .send();
-    }
+    require_auth(_self);
+    require_recipient( from );
 }
 
 void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5) {
@@ -621,6 +528,80 @@ void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, 
         p.betwin = b;
         p.wintype = type;
     });
+
+    auto itr_metadata = metadatas.find(0);
+    uint32_t ratios[10] = {0, 1, 2, 3, 4, 5, 8, 25, 50, 250};
+
+    // records events if wintype >= straight
+    if (itr_user->wintype >= 4) {
+        events.emplace(_self, [&](auto &p){
+            p.id = events.available_primary_key();
+            p.owner = from;
+            p.datetime = now();
+            p.wintype = itr_user->wintype;
+            p.ratio = ratios[itr_user->wintype];
+            p.bet = itr_user->bet;
+            p.betwin = itr_user->betwin;
+            p.card1 = itr_user->card1;
+            p.card2 = itr_user->card2;
+            p.card3 = itr_user->card3;
+            p.card4 = itr_user->card4;
+            p.card5 = itr_user->card5;
+        });
+        eosio_assert(itr_metadata != metadatas.end(), "Metadata is empty.");
+        metadatas.modify(itr_metadata, _self, [&](auto &p){
+            p.eventcnt = p.eventcnt + 1;
+        });
+    }
+    if (itr_metadata->eventcnt > 32) {
+        auto itr_event2 = events.begin();
+        events.erase(itr_event2);
+        metadatas.modify(itr_metadata, _self, [&](auto &p){
+            p.eventcnt = p.eventcnt - 1;
+        });
+    }
+
+    uint64_t mineprice = getminingtableprice(itr_metadata->teosin);
+    uint64_t minemev = itr_user->bet * mineprice / 100;
+    uint64_t meosin = itr_user->bet;
+    uint64_t meosout = itr_user->betwin;
+
+    report(from, minemev, meosin, meosout);
+    auto itr_typestat = typestats.find(itr_user->wintype);
+    typestats.modify(itr_typestat, _self, [&](auto &p) {
+        p.count += 1;
+    });
+
+    char typemap[4] = {'S', 'C', 'H', 'D'};
+    string cc1 = to_string(itr_user->card1) + '[' + typemap[itr_user->card1 / 13] + to_string(itr_user->card1 % 13) + ']';
+    string cc2 = to_string(itr_user->card2) + '[' + typemap[itr_user->card2 / 13] + to_string(itr_user->card2 % 13) + ']';
+    string cc3 = to_string(itr_user->card3) + '[' + typemap[itr_user->card3 / 13] + to_string(itr_user->card3 % 13) + ']';
+    string cc4 = to_string(itr_user->card4) + '[' + typemap[itr_user->card4 / 13] + to_string(itr_user->card4 % 13) + ']';
+    string cc5 = to_string(itr_user->card5) + '[' + typemap[itr_user->card5 / 13] + to_string(itr_user->card5 % 13) + ']';
+    string cbet = to_string(itr_user->bet / 10000) + '.' + to_string(itr_user->bet % 10000) + " EOS";
+    string cbetwin = to_string(itr_user->betwin / 10000) + '.' + to_string(itr_user->betwin % 10000) + " EOS";
+
+    action(permission_level{_self, N(active)}, N(eosvegasjack), N(dealreceipt),
+            std::make_tuple(from, string(itr_user->cardhash1), string(itr_user->cardhash2), string(cc1), string(cc2),
+                    string(cc3), string(cc4), string(cc5), string(cbet),
+                   string(cbetwin), itr_user->bet, itr_user->betwin))
+            .send();
+
+    asset bal = asset(itr_user->betwin, symbol_type(S(4, EOS)));
+    if (bal.amount > 0) {
+        // withdraw
+        action(permission_level{_self, N(active)}, N(eosio.token),
+               N(transfer), std::make_tuple(_self, from, bal,
+                                            std::string("Winner winner chicken dinner! - jacks.MyEosVegas.com")))
+                .send();
+    }
+
+    asset bal2 = asset(minemev, symbol_type(S(4, MEV)));
+    action(permission_level{_self, N(active)}, N(eosvegascoin),
+            N(transfer), std::make_tuple(N(eosvegasjack), from, bal2,
+                    std::string("Gaming deserves rewards!")))
+            .send();
+
 }
 
 bool pokergame1::checkflush(uint32_t colors[5]) {

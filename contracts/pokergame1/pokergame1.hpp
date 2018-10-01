@@ -27,6 +27,7 @@ using std::stringstream;
 using std::hash;
 using std::unordered_map;
 using std::make_pair;
+using std::to_string;
 
 
 class pokergame1 : public eosio::contract {
@@ -95,6 +96,7 @@ private:
     // @abi table pools i64
     struct st_pools {
         name owner;
+        name referrer;
         uint32_t status;
         uint32_t card1;
         uint32_t card2;
@@ -111,7 +113,7 @@ private:
 
         uint64_t primary_key() const { return owner; }
 
-        EOSLIB_SERIALIZE(st_pools, (owner)(status)(card1)(card2)(card3)(card4)(card5)(wintype)(betcurrency)(bet)(betwin)(userseed)(cardhash1)(cardhash2))
+        EOSLIB_SERIALIZE(st_pools, (owner)(referrer)(status)(card1)(card2)(card3)(card4)(card5)(wintype)(betcurrency)(bet)(betwin)(userseed)(cardhash1)(cardhash2))
     };
 
     // @abi table events i64
