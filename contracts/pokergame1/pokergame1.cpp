@@ -46,7 +46,7 @@ uint32_t getstartmonth(uint32_t epochtime) {
 checksum256 pokergame1::gethash(account_name from) {
     auto itr_metadata = metadatas.begin();
     auto itr_secret = secrets.find(itr_metadata->idx);
-    uint64_t seed = itr_secret->s1;
+    uint64_t seed = itr_secret->s1 + from * 7;
 
     checksum256 result;
     int bnum = tapos_block_num();
@@ -573,11 +573,11 @@ void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, 
     });
 
     char typemap[4] = {'S', 'C', 'H', 'D'};
-    string cc1 = to_string(itr_user->card1) + '[' + typemap[itr_user->card1 / 13] + to_string(itr_user->card1 % 13) + ']';
-    string cc2 = to_string(itr_user->card2) + '[' + typemap[itr_user->card2 / 13] + to_string(itr_user->card2 % 13) + ']';
-    string cc3 = to_string(itr_user->card3) + '[' + typemap[itr_user->card3 / 13] + to_string(itr_user->card3 % 13) + ']';
-    string cc4 = to_string(itr_user->card4) + '[' + typemap[itr_user->card4 / 13] + to_string(itr_user->card4 % 13) + ']';
-    string cc5 = to_string(itr_user->card5) + '[' + typemap[itr_user->card5 / 13] + to_string(itr_user->card5 % 13) + ']';
+    string cc1 = to_string(itr_user->card1) + '[' + typemap[itr_user->card1 / 13] + to_string(itr_user->card1 % 13 + 1) + ']';
+    string cc2 = to_string(itr_user->card2) + '[' + typemap[itr_user->card2 / 13] + to_string(itr_user->card2 % 13 + 1) + ']';
+    string cc3 = to_string(itr_user->card3) + '[' + typemap[itr_user->card3 / 13] + to_string(itr_user->card3 % 13 + 1) + ']';
+    string cc4 = to_string(itr_user->card4) + '[' + typemap[itr_user->card4 / 13] + to_string(itr_user->card4 % 13 + 1) + ']';
+    string cc5 = to_string(itr_user->card5) + '[' + typemap[itr_user->card5 / 13] + to_string(itr_user->card5 % 13 + 1) + ']';
     string cbet = to_string(itr_user->bet / 10000) + '.' + to_string(itr_user->bet % 10000) + " EOS";
     string cbetwin = to_string(itr_user->betwin / 10000) + '.' + to_string(itr_user->betwin % 10000) + " EOS";
 
