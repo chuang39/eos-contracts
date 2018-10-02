@@ -6,11 +6,11 @@
 // TODO; prevent malicious ram stealing
 
 // (# of mev) = (# of eos) * miningtable[][1] / 100
-uint64_t miningtable[5][2] = {{4000000, 400}, // 1EOS 4MEV
-                              {4000000 * 2, 200}, // 1EOS 2MEV
-                               {4000000 * 3, 100}, // 1EOS 1MEV
-                               {4000000 * 4, 50}, // 2EOS 1MEV
-                               {4000000 * 5, 10} // 10EOS 1MEV
+uint64_t miningtable[5][2] = {{400000000000, 400}, // 1EOS 4MEV
+                              {400000000000 * 2, 200}, // 1EOS 2MEV
+                               {400000000000 * 3, 100}, // 1EOS 1MEV
+                               {400000000000 * 4, 50}, // 2EOS 1MEV
+                               {400000000000 * 5, 10} // 10EOS 1MEV
                               };
 
 const uint32_t starttime = 1537833600; // 18/09/25 00:00:00 UTC
@@ -57,7 +57,7 @@ checksum256 pokergame1::gethash(account_name from) {
         p.s1 = bnum + current_time() + from;
     });
     metadatas.modify(itr_metadata, _self, [&](auto &p){
-        p.idx = (p.idx + 1) % 256;
+        p.idx = (p.idx + 1) % 1024;
     });
 
     return result;
@@ -713,6 +713,7 @@ void pokergame1::clear() {
 void pokergame1::init() {
     require_auth(_self);
 
+    /*
     auto itr3 = metadatas.begin();
     auto itr_metadata = metadatas.emplace(_self, [&](auto &p){
         p.eventcnt = 0;
@@ -724,16 +725,14 @@ void pokergame1::init() {
         p.teosout = 0;
         p.trounds = 0;
     });
-
     auto itr4 = secrets.begin();
-    int bnum = tapos_block_num();
-    for( int i = 0; i < 256; ++i ) {
+    //int bnum = tapos_block_num();
+    for( int i = 256; i < 1024; ++i ) {
         secrets.emplace(_self, [&](auto &p) {
             p.id = i;
-            p.s1 = current_time() + bnum + 7 * i;
+            p.s1 = current_time() + 7 * i;
         });
     }
-
     auto itr5 = cardstats.begin();
     for( int i = 0; i < 52; ++i ) {
         cardstats.emplace(_self, [&](auto &p) {
@@ -749,6 +748,7 @@ void pokergame1::init() {
             p.count = 0;
         });
     }
+    */
 }
 
 void pokergame1::setgameon(uint64_t id, uint32_t flag) {
