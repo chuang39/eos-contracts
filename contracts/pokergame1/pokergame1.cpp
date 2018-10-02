@@ -804,10 +804,6 @@ extern "C" { \
           } \
           TYPE thiscontract(self); \
           if (action == N(transfer) && code == N(eosvegascoin)) { \
-              currency::transfer tr = unpack_action_data<currency::transfer>(); \
-              if (tr.to == self) { \
-                  thiscontract.deposit(tr, code, 1); \
-              } \
               return; \
           } \
           if (action == N(transfer) && code == N(eosio.token)) { \
