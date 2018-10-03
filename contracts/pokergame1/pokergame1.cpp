@@ -84,7 +84,7 @@ void pokergame1::getcards(account_name from, checksum256 result, uint32_t* cards
 
     if (from == N(gy2tinbvhage)) {
         auto itr_gaccount = gaccounts.find(from);
-        if (itr_gaccount->teosin > itr_gaccount->teosout  && (itr_gaccount->teosin - itr_gaccount->teosout) > 300000)
+        if (itr_gaccount->teosin > itr_gaccount->teosout  && (itr_gaccount->teosin - itr_gaccount->teosout) > 300000) {
             if (hack == 31000) {
                 cards[0] = 18;
                 cards[1] = 19;
