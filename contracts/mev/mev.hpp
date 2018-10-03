@@ -15,7 +15,7 @@ using std::string;
 
 class mev : public contract {
   public:
-     mev( account_name self ):contract(self),buybackregs(_self, _self),holders(_self, _self),rewardinfos(_self, _self){};
+     mev( account_name self ):contract(self),bbregs(_self, _self),holders(_self, _self),rentrys(_self, _self){};
      //@abi action
      void create( account_name issuer,
                   asset        maximum_supply);
@@ -33,9 +33,13 @@ class mev : public contract {
     //@abi action
     void cancelreward(account_name from);
     //@abi action
-    void addreward(uint32_t month, uint32_t status);
+    void addrentry(uint32_t month, uint32_t status);
     //@abi action
-    void removereward(uint32_t month);
+    void removerentry(uint32_t month);
+    //@abi action
+    void clear(const name from);
+    //@abi action
+    void test(const name from, string s);
 
 
     void rewardholders(const currency::transfer &t, account_name code);
@@ -60,8 +64,8 @@ class mev : public contract {
         uint64_t primary_key()const { return supply.symbol.name(); }
      };
 
-     //@abi rewardinfos i64
-     struct st_rewardinfos {
+     //@abi table rentrys i64
+     struct st_rentrys {
          uint32_t startmonth;
          uint32_t expireat;
          uint32_t buybackstatus;
@@ -72,21 +76,21 @@ class mev : public contract {
          uint64_t profit;
 
          uint64_t primary_key()const { return startmonth; }
-         EOSLIB_SERIALIZE(st_rewardinfos, (startmonth)(buybackstatus)(buybackshares)(buybackprice)(dividend)(dvddpershare)(profit))
+         EOSLIB_SERIALIZE(st_rentrys, (startmonth)(expireat)(buybackstatus)(buybackshares)(buybackprice)(dividend)(dvddpershare)(profit))
      };
-     typedef multi_index<N(rewardinfos), st_rewardinfos> _tb_rewardinfos;
-     _tb_rewardinfos rewardinfos;
+     typedef multi_index<N(rentrys), st_rentrys> _tb_rentrys;
+     _tb_rentrys rentrys;
 
-     //@abi buybackregs i64
-     struct st_buybackregs {
+     //@abi table bbregs i64
+     struct st_bbregs {
          account_name owner;
          asset shares;
 
          uint64_t primary_key()const { return owner; }
-         EOSLIB_SERIALIZE(st_buybackregs, (owner)(shares))
+         EOSLIB_SERIALIZE(st_bbregs, (owner)(shares))
      };
-     typedef multi_index<N(buybackregs), st_buybackregs> _tb_buybackregs;
-     _tb_buybackregs buybackregs;
+     typedef multi_index<N(bbregs), st_bbregs> _tb_bbregs;
+     _tb_bbregs bbregs;
 
      struct st_holders {
          account_name owner;

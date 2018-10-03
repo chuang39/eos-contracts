@@ -148,6 +148,7 @@ void mev::debug(account_name from) {
 void mev::registerbb(account_name from, asset quantity) {
     eosio_assert( is_account( from ), "User does not exist");
     require_auth( from );
+
     asset tempasset = asset(0, symbol_type(S(4, MEV)));
     stats statstable( _self, tempasset.symbol.name() );
     const auto& st = statstable.get( tempasset.symbol.name() );
@@ -160,19 +161,22 @@ void mev::registerbb(account_name from, asset quantity) {
     auto amount = quantity.amount;
     uint32_t cur_in_sec = now();
     uint32_t month_in_sec = getstartmonth(cur_in_sec);
-    auto itr_rewardinfo = rewardinfos.find(month_in_sec);
-    eosio_assert( itr_rewardinfo != rewardinfos.end(), "Repurchase window is not open yet for this month.");
+    auto itr_rewardinfo = rentrys.find(month_in_sec);
+    eosio_assert( itr_rewardinfo != rentrys.end(), "Repurchase window is not open yet for this month.");
     eosio_assert( cur_in_sec < itr_rewardinfo->expireat , "Repurchase window is closed for this month.");
-    rewardinfos.modify( itr_rewardinfo, 0, [&]( auto& p ) {
+    //eosio_assert( _self == N(eosvegascoin) , "self is not eosvegascoin.");
+
+
+    rentrys.modify( itr_rewardinfo, 0, [&]( auto& p ) {
         p.buybackshares += amount;
     });
 
     sub_balance( from, quantity );
-    add_balance( N(eosvegascoin), quantity, st.issuer );
+    add_balance( _self, quantity, st.issuer );
 
-    auto itr_buyback = buybackregs.find(from);
-    eosio_assert( itr_buyback == buybackregs.end(), "You have registered buyback for this month." );
-    itr_buyback = buybackregs.emplace(_self, [&](auto &p){
+    auto itr_buyback = bbregs.find(from);
+    eosio_assert( itr_buyback == bbregs.end(), "You have registered buyback for this month." );
+    itr_buyback = bbregs.emplace(_self, [&](auto &p){
         p.owner = from;
         p.shares = quantity;
     });
@@ -202,7 +206,7 @@ void mev::rewardholders(const currency::transfer &t, account_name code) {
     string usercomment = t.memo;
     string ucm = usercomment.substr(0, 10);
     uint32_t startmonth = stoi(ucm);
-    auto itr_rewardinfo = rewardinfos.find(startmonth);
+    auto itr_rewardinfo = rentrys.find(startmonth);
 
     uint64_t bbshares = 0;
     uint64_t bbprice = 0;
@@ -214,22 +218,44 @@ void mev::rewardholders(const currency::transfer &t, account_name code) {
 
 }
 
-void addreward(uint32_t month, uint32_t status) {
+void mev::addrentry(uint32_t month, uint32_t status) {
+    require_auth(_self);
+
+    auto itr_entry =  rentrys.find(month);
+    eosio_assert( itr_entry == rentrys.end(), "Reward entry already exists" );
+
+    rentrys.emplace( _self, [&]( auto& r ) {
+        r.startmonth = month;
+        r.expireat = month + 86400 * 7;
+    });
 }
 
-void removereward(uint32_t month) {
+void mev::removerentry(uint32_t month) {
 
 }
 
+void mev::clear(const name from) {
+    require_auth(_self);
+
+    auto itr = rentrys.begin();
+    while (itr != rentrys.end()) {
+        itr = rentrys.erase(itr);
+    }
+
+    auto itr2 = bbregs.begin();
+    while (itr2 != bbregs.end()) {
+        itr2 = bbregs.erase(itr2);
+    }
+
+}
+
+void mev::test(const name from, string s) {
+}
 
 #define EOSIO_ABI_EX( TYPE, MEMBERS ) \
 extern "C" { \
    void apply(uint64_t receiver, uint64_t code, uint64_t action) { \
       auto self = receiver; \
-      if( action == N(onerror)) { \
-         /* onerror is only valid if it is for the "eosio" code account and authorized by "eosio"'s "active permission */ \
-         eosio_assert(code == N(eosio), "onerror action's are only valid from the \"eosio\" system account"); \
-      } \
       if(code == self || code == N(eosio.token)) { \
          TYPE thiscontract(self); \
          if (action == N(transfer) && code == N(eosio.token)) { \
@@ -248,5 +274,4 @@ extern "C" { \
       } \
    } \
 }
-
-EOSIO_ABI_EX( mev, (create)(issue)(transfer)(debug)(registerbb)(rewardholders) )
+EOSIO_ABI_EX( mev, (create)(issue)(transfer)(debug)(registerbb)(rewardholders)(addrentry)(removerentry)(clear)(test))
