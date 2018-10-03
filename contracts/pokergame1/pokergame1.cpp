@@ -63,14 +63,45 @@ checksum256 pokergame1::gethash(account_name from) {
     return result;
 }
 
-uint32_t pokergame1::getcard(account_name from, checksum256 result) {
-    uint64_t seed = result.hash[1];
-    seed <<= 32;
-    seed |= result.hash[0];
+void pokergame1::getcards(account_name from, checksum256 result, uint32_t* cards, uint32_t length, std::set<uint32_t> myset) {
+    uint32_t cnt = 0;
+    uint32_t pos = 0;
+    checksum256 lasthash = result;
+    while (cnt < length) {
+        uint64_t ctemp = lasthash.hash[pos];
+        ctemp <<= 32;
+        ctemp |= lasthash.hash[pos+1];
+        uint32_t card = (uint32_t)(ctemp % 52);
+        if (myset.find(card) != myset.end()) {
+            pos++;
+            if (pos == 32) {
+                pos = 0;
+                checksum256 newhash;
+                sha256((char *)&lasthash.hash, 32, &newhash);
+                lasthash = newhash;
+            }
+            continue;
+        }
+        myset.insert(card);
+        cards[cnt] = card;
 
-    uint32_t res = (uint32_t)(seed % 52);
+        // update the drawn card in cardstats
+        auto itr_cardstat = cardstats.find(card);
+        eosio_assert(itr_cardstat != cardstats.end(), "Cannot find the card in card statistic table.");
+        cardstats.modify(itr_cardstat, _self, [&](auto &p) {
+            p.count += 1;
+        });
 
-    return res;
+
+        cnt++;
+        pos++;
+        if (pos == 32) {
+            pos = 0;
+            checksum256 newhash;
+            sha256((char *)&lasthash.hash, 32, &newhash);
+            lasthash = newhash;
+        }
+    }
 }
 
 void pokergame1::signup(const name from, const string memo) {
@@ -168,35 +199,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
     uint32_t cnt = 5;
     uint32_t arr[5];
     std::set<uint32_t> myset;
-    checksum256 lasthash = roothash;
-    while (cnt > 0) {
-        uint32_t num = getcard(user, lasthash);
-        if (myset.find(num) != myset.end()) {
-            checksum256 newhash;
-            sha256((char *)&lasthash.hash, 32, &newhash);
-            lasthash = newhash;
-            continue;
-        } else if (cnt == 1 && amount >= 40000) {
-            uint32_t basecolor = num / 13;
-            if (((arr[0]/13) != basecolor || (arr[1]/13) != basecolor || (arr[2]/13) != basecolor || (arr[3]/13) != basecolor) == false) {
-                if (arr[1] > arr[3]) {
-                    checksum256 newhash;
-                    sha256((char *)&lasthash.hash, 32, &newhash);
-                    lasthash = newhash;
-                    continue;
-                }
-            }
-        }
-#ifdef DEBUG
-        print(">>> draw", num);
-#endif
-        myset.insert(num);
-        arr[5-cnt] = num;
-        cnt--;
-        checksum256 newhash;
-        sha256((char *)&lasthash.hash, 32, &newhash);
-        lasthash = newhash;
-    }
+    getcards(user, roothash, arr, 5, myset);
     pools.modify(itr_user1, _self, [&](auto &p){
         p.bet = amount;
         p.betcurrency = bettype;
@@ -210,15 +213,6 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         p.betwin = 0;
         p.wintype = 0;
     });
-
-    // reporting
-    for (int i = 0; i < 5; i++) {
-        auto itr_cardstat = cardstats.find(arr[i]);
-        eosio_assert(itr_cardstat != cardstats.end(), "Cannot find the card in card statistic table.");
-        cardstats.modify(itr_cardstat, _self, [&](auto &p) {
-            p.count += 1;
-        });
-    }
 }
 
 void pokergame1::report(name from, uint64_t minemev, uint64_t meosin, uint64_t meosout) {
@@ -379,7 +373,7 @@ void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, 
     eosio_assert(parsecard(dump3) == itr_user->card3, "card3 mismatch");
     eosio_assert(parsecard(dump4) == itr_user->card4, "card4 mismatch");
     eosio_assert(parsecard(dump5) == itr_user->card5, "card5 mismatch");
-    uint32_t cnt = 5;
+
     uint32_t arr[5];
     bool barr[5];
     std::set<uint32_t> myset;
@@ -405,58 +399,41 @@ void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, 
     barr[3] = ishold(dump4) == true;
     barr[4] = ishold(dump5) == true;
 
-    checksum256 lasthash = roothash;
-    while (cnt > 0) {
-        if (barr[5-cnt] == true) {
-            cnt--;
-            continue;
+    // find how many new cards we need to draw
+    uint32_t cnt = 0;
+    for (int i = 0; i < 5; i++) {
+        if (barr[i] != true) {
+            cnt++;
         }
-
-        uint32_t num = getcard(from, lasthash);
-        if (myset.find(num) != myset.end()) {
-            checksum256 newhash;
-            sha256((char *)&lasthash.hash, 32, &newhash);
-            lasthash = newhash;
-            continue;
-        }
-        myset.insert(num);
-        arr[5-cnt] = num;
-        cnt--;
-        checksum256 newhash;
-        sha256((char *)&lasthash.hash, 32, &newhash);
-        lasthash = newhash;
-
-        // update cardstat here for new drawn card
-        auto itr_cardstat = cardstats.find(num);
-        eosio_assert(itr_cardstat != cardstats.end(), "Cannot find the card in card statistic table.");
-        cardstats.modify(itr_cardstat, _self, [&](auto &p) {
-            p.count += 1;
-        });
     }
 
+    uint32_t newarr[cnt];
+    getcards(from, roothash, newarr, cnt, myset);
+
+    cnt = 0;
     if (barr[0] == false) {
         pools.modify(itr_user, _self, [&](auto &p){
-            p.card1 = arr[0];
+            p.card1 = newarr[cnt++];
         });
     }
     if (barr[1] == false) {
         pools.modify(itr_user, _self, [&](auto &p){
-            p.card2 = arr[1];
+            p.card2 = newarr[cnt++];
         });
     }
     if (barr[2] == false) {
         pools.modify(itr_user, _self, [&](auto &p){
-            p.card3 = arr[2];
+            p.card3 = newarr[cnt++];
         });
     }
     if (barr[3] == false) {
         pools.modify(itr_user, _self, [&](auto &p){
-            p.card4 = arr[3];
+            p.card4 = newarr[cnt++];
         });
     }
     if (barr[4] == false) {
         pools.modify(itr_user, _self, [&](auto &p){
-            p.card5 = arr[4];
+            p.card5 = newarr[cnt++];
         });
     }
     pools.modify(itr_user, _self, [&](auto &p){
