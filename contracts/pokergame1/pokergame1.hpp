@@ -64,7 +64,7 @@ public:
     void setminingon(uint64_t id, uint32_t flag);
     //@abi action
     void signup(const name from, const string memo);
-    checksum256 gethash(account_name from);
+    checksum256 gethash(account_name from, uint32_t externalsrc, uint32_t rounds);
     void getcards(account_name from, checksum256 result, uint32_t* cards, uint32_t num, std::set<uint32_t> myset);
     void deposit(const currency::transfer &t, account_name code, uint32_t bettype);
     bool checkflush(uint32_t colors[5]);

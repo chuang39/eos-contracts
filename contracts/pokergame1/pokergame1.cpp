@@ -43,18 +43,31 @@ uint32_t getstartmonth(uint32_t epochtime) {
     return mstarttimes[4];
 }
 
-checksum256 pokergame1::gethash(account_name from) {
+checksum256 pokergame1::gethash(account_name from, uint32_t externalsrc, uint32_t rounds) {
     auto itr_metadata = metadatas.begin();
     auto itr_secret = secrets.find(itr_metadata->idx);
-    uint64_t seed = itr_secret->s1 + from * 7;
+    uint64_t seed = itr_secret->s1 + from * 7 + externalsrc * 3;
 
     checksum256 result;
-    int bnum = tapos_block_num();
     sha256((char *)&seed, sizeof(seed), &result);
 
+    uint64_t bias = 0;
+    for (int i = 0; i < 8; i++) {
+        bias |= result.hash[7 - i];
+        bias <<= 8;
+    }
 
-    secrets.modify(itr_secret, _self, [&](auto &p){
-        p.s1 = bnum + current_time() + from;
+    uint64_t src64 = ((uint64_t)externalsrc) << 2;
+    uint64_t round64 = ((uint64_t)rounds) << 32;
+    bias = bias + src64 + round64;
+    if (rounds % 4096 == 0) {
+        bias += current_time() + tapos_block_num();
+    }
+
+    uint64_t lastidx = itr_metadata->idx == 0 ? 1023 : itr_metadata->idx;
+    auto itr_last = secrets.find(lastidx);
+    secrets.modify(itr_last, _self, [&](auto &p){
+        p.s1 = bias;
     });
     metadatas.modify(itr_metadata, _self, [&](auto &p){
         p.idx = (p.idx + 1) % 1024;
@@ -91,7 +104,6 @@ void pokergame1::getcards(account_name from, checksum256 result, uint32_t* cards
         cardstats.modify(itr_cardstat, _self, [&](auto &p) {
             p.count += 1;
         });
-
 
         cnt++;
         pos++;
@@ -185,7 +197,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
 
     // start a new round
     // deposit money and draw 5 cards
-    checksum256 roothash = gethash(user);
+    checksum256 roothash = gethash(user, 0, itr_metadata->trounds);
 
     string rhash;
     char const hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
@@ -374,6 +386,7 @@ void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, 
     eosio_assert(parsecard(dump4) == itr_user->card4, "card4 mismatch");
     eosio_assert(parsecard(dump5) == itr_user->card5, "card5 mismatch");
 
+    auto itr_metadata = metadatas.find(0);
     uint32_t arr[5];
     bool barr[5];
     std::set<uint32_t> myset;
@@ -383,7 +396,7 @@ void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, 
     myset.insert(itr_user->card4);
     myset.insert(itr_user->card5);
 
-    checksum256 roothash = gethash(from);
+    checksum256 roothash = gethash(from, externalsrc, itr_metadata->trounds);
     string rhash;
     char const hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
     for( int i = 0; i < 32; ++i )
@@ -506,7 +519,6 @@ void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, 
         p.wintype = type;
     });
 
-    auto itr_metadata = metadatas.find(0);
     uint32_t ratios[10] = {0, 1, 2, 3, 4, 5, 8, 25, 50, 250};
 
     // records events if wintype >= straight
