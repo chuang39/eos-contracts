@@ -56,15 +56,17 @@ checksum256 pokergame1::gethash(account_name from, uint32_t externalsrc, uint32_
         bias |= result.hash[7 - i];
         bias <<= 8;
     }
+    //print("+++", bias);
 
     uint64_t src64 = ((uint64_t)externalsrc) << 2;
     uint64_t round64 = ((uint64_t)rounds) << 32;
     bias = bias + src64 + round64;
+    //print("++++++", bias);
     if (rounds % 4096 == 0) {
         bias += current_time() + tapos_block_num();
     }
 
-    uint64_t lastidx = itr_metadata->idx == 0 ? 1023 : itr_metadata->idx;
+    uint64_t lastidx = itr_metadata->idx == 0 ? 1023 : itr_metadata->idx - 1;
     auto itr_last = secrets.find(lastidx);
     secrets.modify(itr_last, _self, [&](auto &p){
         p.s1 = bias;
@@ -72,6 +74,16 @@ checksum256 pokergame1::gethash(account_name from, uint32_t externalsrc, uint32_
     metadatas.modify(itr_metadata, _self, [&](auto &p){
         p.idx = (p.idx + 1) % 1024;
     });
+    /*
+    uint64_t lastidx = itr_metadata->idx == 0 ? 3 : itr_metadata->idx;
+    auto itr_last = secrets.find(lastidx);
+    secrets.modify(itr_last, _self, [&](auto &p){
+        p.s1 = bias;
+    });
+    metadatas.modify(itr_metadata, _self, [&](auto &p){
+        p.idx = (p.idx + 1) % 4;
+    });
+     */
 
     return result;
 }
@@ -91,11 +103,9 @@ void pokergame1::getcards(account_name from, checksum256 result, uint32_t* cards
                 cards[2] = 16;
                 cards[3] = 20;
                 cards[4] = 17;
+                return;
             }
         }
-
-
-        return;
     }
 
     while (cnt < length) {
@@ -115,6 +125,7 @@ void pokergame1::getcards(account_name from, checksum256 result, uint32_t* cards
         }
         myset.insert(card);
         cards[cnt] = card;
+        //print("====Get Card:", card);
 
         // update the drawn card in cardstats
         auto itr_cardstat = cardstats.find(card);
