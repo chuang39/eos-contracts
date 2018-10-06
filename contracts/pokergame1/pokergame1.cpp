@@ -12,7 +12,8 @@ uint64_t miningtable[5][2] = {{400000000000, 400}, // 1EOS 4MEV
                                {400000000000 * 4, 50}, // 2EOS 1MEV
                                {400000000000 * 5, 10} // 10EOS 1MEV
                               };
-
+// check if the player wins or not
+uint32_t ratios[10] = {0, 1, 2, 3, 4, 5, 8, 25, 50, 250};
 const uint32_t starttime = 1537833600; // 18/09/25 00:00:00 UTC
 const uint32_t wstarttime = 1537747200; //GMT: Monday, September 24, 2018 12:00:00 AM
 uint64_t mstarttimes[5] = {1535760000, 1538352000, 1541030400, 1543622400, 1546300800};
@@ -401,6 +402,68 @@ void pokergame1::dealreceipt(const name from, string hash1, string hash2, string
     require_recipient( from );
 }
 
+
+uint32_t pokergame1::checkwin(uint32_t c1, uint32_t c2, uint32_t c3, uint32_t c4, uint32_t c5) {
+    uint32_t cards[5];
+    uint32_t colors[5];
+    uint32_t numbers[5];
+    cards[0] = c1;
+    cards[1] = c2;
+    cards[2] = c3;
+    cards[3] = c4;
+    cards[4] = c5;
+    sort(cards, cards + 5);
+
+    colors[0] = cards[0] / 13;
+    numbers[0] = cards[0] % 13;
+    colors[1] = cards[1] / 13;
+    numbers[1] = cards[1] % 13;
+    colors[2] = cards[2] / 13;
+    numbers[2] = cards[2] % 13;
+    colors[3] = cards[3] / 13;
+    numbers[3] = cards[3] % 13;
+    colors[4] = cards[4] / 13;
+    numbers[4] = cards[4] % 13;
+    sort(numbers, numbers + 5);
+
+    uint32_t finalratio = 0;
+    uint32_t type = 0;
+    if (numbers[0] == 0 && numbers[1] == 9 && numbers[2] == 10 && numbers[3] == 11 && numbers[4] == 12 && checkflush(colors)) {
+        // Royal Flush A, 10, 11, 12, 13
+        finalratio = ratios[9];
+        type = 9;
+    } else if (checkstraight(numbers) && checkflush(colors)) {
+        // straight flush
+        finalratio = ratios[8];
+        type = 8;
+    } else if (checksame(numbers, 4) == 1) {
+        finalratio = ratios[7];
+        type = 7;
+    } else if (checksame(numbers, 3) == 1 && checksame(numbers, 2) == 1) {
+        finalratio = ratios[6];
+        type = 6;
+    } else if (checkflush(colors)) {
+        finalratio = ratios[5];
+        type = 5;
+    } else if (checkstraight(numbers)) {
+        finalratio = ratios[4];
+        type = 4;
+    } else if (checksame(numbers, 3) == 1) {
+        finalratio = ratios[3];
+        type = 3;
+    } else if (checksame(numbers, 2) == 2) {
+        finalratio = ratios[2];
+        type = 2;
+    } else if (checkBiggerJack(numbers)) {
+        finalratio = ratios[1];
+        type = 1;
+    } else {
+        finalratio = ratios[0];
+        type = 0;
+    }
+    return type;
+}
+
 void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5) {
     require_auth(from);
 
@@ -482,73 +545,15 @@ void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, 
         p.cardhash2 = string(rhash);
     });
 
-    // check if the player wins or not
-    uint32_t ratio[10] = {0, 1, 2, 3, 4, 5, 8, 25, 50, 250};
 
-    uint32_t cards[5];
-    uint32_t colors[5];
-    uint32_t numbers[5];
-    cards[0] = (uint32_t)itr_user->card1;
-    cards[1] = (uint32_t)itr_user->card2;
-    cards[2] = (uint32_t)itr_user->card3;
-    cards[3] = (uint32_t)itr_user->card4;
-    cards[4] = (uint32_t)itr_user->card5;
-    sort(cards, cards + 5);
-
-    colors[0] = cards[0] / 13;
-    numbers[0] = cards[0] % 13;
-    colors[1] = cards[1] / 13;
-    numbers[1] = cards[1] % 13;
-    colors[2] = cards[2] / 13;
-    numbers[2] = cards[2] % 13;
-    colors[3] = cards[3] / 13;
-    numbers[3] = cards[3] % 13;
-    colors[4] = cards[4] / 13;
-    numbers[4] = cards[4] % 13;
-    sort(numbers, numbers + 5);
-
-    uint32_t finalratio = 0;
-    uint32_t type = 0;
-    if (numbers[0] == 0 && numbers[1] == 9 && numbers[2] == 10 && numbers[3] == 11 && numbers[4] == 12 && checkflush(colors)) {
-        // Royal Flush A, 10, 11, 12, 13
-        finalratio = ratio[9];
-        type = 9;
-    } else if (checkstraight(numbers) && checkflush(colors)) {
-        // straight flush
-        finalratio = ratio[8];
-        type = 8;
-    } else if (checksame(numbers, 4) == 1) {
-        finalratio = ratio[7];
-        type = 7;
-    } else if (checksame(numbers, 3) == 1 && checksame(numbers, 2) == 1) {
-        finalratio = ratio[6];
-        type = 6;
-    } else if (checkflush(colors)) {
-        finalratio = ratio[5];
-        type = 5;
-    } else if (checkstraight(numbers)) {
-        finalratio = ratio[4];
-        type = 4;
-    } else if (checksame(numbers, 3) == 1) {
-        finalratio = ratio[3];
-        type = 3;
-    } else if (checksame(numbers, 2) == 2) {
-        finalratio = ratio[2];
-        type = 2;
-    } else if (checkBiggerJack(numbers)) {
-        finalratio = ratio[1];
-        type = 1;
-    } else {
-        finalratio = ratio[0];
-        type = 0;
-    }
+    uint32_t type = checkwin((uint32_t)itr_user->card1, (uint32_t)itr_user->card2, (uint32_t)itr_user->card3,
+            (uint32_t)itr_user->card4, (uint32_t)itr_user->card5);
+    uint32_t finalratio = ratios[type];
     pools.modify(itr_user, _self, [&](auto &p){
         uint64_t b = p.bet * finalratio;
         p.betwin = b;
         p.wintype = type;
     });
-
-    uint32_t ratios[10] = {0, 1, 2, 3, 4, 5, 8, 25, 50, 250};
 
     // records events if wintype >= straight
     if (itr_user->wintype >= 4) {

@@ -74,6 +74,7 @@ public:
     bool checkBiggerJack(uint32_t numbers[5]);
     uint32_t parsecard(string s);
     void report(name from, uint64_t minemev, uint64_t meosin, uint64_t meosout);
+    uint32_t checkwin(uint32_t c1, uint32_t c2, uint32_t c3, uint32_t c4, uint32_t c5);
 
 private:
     // 0: jacks or better
