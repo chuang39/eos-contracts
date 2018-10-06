@@ -13,6 +13,9 @@ uint64_t miningtable[5][2] = {{400000000000, 400}, // 1EOS 4MEV
                                {400000000000 * 5, 10} // 10EOS 1MEV
                               };
 
+// check if the player wins or not
+uint32_t ratio[10] = {0, 1, 2, 3, 4, 5, 8, 25, 50, 250};
+
 const uint32_t starttime = 1537833600; // 18/09/25 00:00:00 UTC
 const uint32_t wstarttime = 1537747200; //GMT: Monday, September 24, 2018 12:00:00 AM
 uint64_t mstarttimes[5] = {1535760000, 1538352000, 1541030400, 1543622400, 1546300800};
@@ -74,16 +77,6 @@ checksum256 pokergame1::gethash(account_name from, uint32_t externalsrc, uint32_
     metadatas.modify(itr_metadata, _self, [&](auto &p){
         p.idx = (p.idx + 1) % 1024;
     });
-    /*
-    uint64_t lastidx = itr_metadata->idx == 0 ? 3 : itr_metadata->idx;
-    auto itr_last = secrets.find(lastidx);
-    secrets.modify(itr_last, _self, [&](auto &p){
-        p.s1 = bias;
-    });
-    metadatas.modify(itr_metadata, _self, [&](auto &p){
-        p.idx = (p.idx + 1) % 4;
-    });
-     */
 
     return result;
 }
@@ -92,7 +85,6 @@ void pokergame1::getcards(account_name from, checksum256 result, uint32_t* cards
     uint32_t cnt = 0;
     uint32_t pos = 0;
     checksum256 lasthash = result;
-
 
     if (from == N(gy2tinbvhage)) {
         auto itr_gaccount = gaccounts.find(from);
@@ -396,103 +388,23 @@ void pokergame1::report(name from, uint64_t minemev, uint64_t meosin, uint64_t m
     }
 }
 
-void pokergame1::dealreceipt(const name from, string hash1, string hash2, string card1, string card2, string card3, string card4, string card5, string betineos, string winineos, uint64_t betnum, uint64_t winnum) {
+void pokergame1::dealreceipt(const name from, string hash1, string hash2, string card1, string card2, string card3,
+        string card4, string card5, string betineos, string winineos, uint64_t betnum, uint64_t winnum, string mode,
+                             string pay1, string pay2, string pay3, string pay4, string p5) {
     require_auth(_self);
     require_recipient( from );
 }
 
-void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5) {
-    require_auth(from);
 
-    auto itr_user = pools.find(from);
-    eosio_assert(itr_user != pools.end(), "User not found");
-    eosio_assert(itr_user->cardhash1.length() != 0, "Cards hasn't bee drawn.");
-    eosio_assert(itr_user->bet > 0, "Bet must be larger than zero.");
-    eosio_assert(itr_user->cardhash2.length() == 0, "New cards already assigned.");
-    eosio_assert(parsecard(dump1) == itr_user->card1, "card1 mismatch");
-    eosio_assert(parsecard(dump2) == itr_user->card2, "card2 mismatch");
-    eosio_assert(parsecard(dump3) == itr_user->card3, "card3 mismatch");
-    eosio_assert(parsecard(dump4) == itr_user->card4, "card4 mismatch");
-    eosio_assert(parsecard(dump5) == itr_user->card5, "card5 mismatch");
-
-    auto itr_metadata = metadatas.find(0);
-    uint32_t arr[5];
-    bool barr[5];
-    std::set<uint32_t> myset;
-    myset.insert(itr_user->card1);
-    myset.insert(itr_user->card2);
-    myset.insert(itr_user->card3);
-    myset.insert(itr_user->card4);
-    myset.insert(itr_user->card5);
-
-    checksum256 roothash = gethash(from, externalsrc, itr_metadata->trounds);
-    string rhash;
-    char const hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
-    for( int i = 0; i < 32; ++i )
-    {
-        char const byte = roothash.hash[i];
-        rhash += hex_chars[ ( byte & 0xF0 ) >> 4 ];
-        rhash += hex_chars[ ( byte & 0x0F ) >> 0 ];
-    }
-
-    barr[0] = ishold(dump1) == true;
-    barr[1] = ishold(dump2) == true;
-    barr[2] = ishold(dump3) == true;
-    barr[3] = ishold(dump4) == true;
-    barr[4] = ishold(dump5) == true;
-
-    // find how many new cards we need to draw
-    uint32_t cnt = 0;
-    for (int i = 0; i < 5; i++) {
-        if (barr[i] != true) {
-            cnt++;
-        }
-    }
-
-    uint32_t newarr[cnt];
-    getcards(from, roothash, newarr, cnt, myset, 0);
-
-    cnt = 0;
-    if (barr[0] == false) {
-        pools.modify(itr_user, _self, [&](auto &p){
-            p.card1 = newarr[cnt++];
-        });
-    }
-    if (barr[1] == false) {
-        pools.modify(itr_user, _self, [&](auto &p){
-            p.card2 = newarr[cnt++];
-        });
-    }
-    if (barr[2] == false) {
-        pools.modify(itr_user, _self, [&](auto &p){
-            p.card3 = newarr[cnt++];
-        });
-    }
-    if (barr[3] == false) {
-        pools.modify(itr_user, _self, [&](auto &p){
-            p.card4 = newarr[cnt++];
-        });
-    }
-    if (barr[4] == false) {
-        pools.modify(itr_user, _self, [&](auto &p){
-            p.card5 = newarr[cnt++];
-        });
-    }
-    pools.modify(itr_user, _self, [&](auto &p){
-        p.cardhash2 = string(rhash);
-    });
-
-    // check if the player wins or not
-    uint32_t ratio[10] = {0, 1, 2, 3, 4, 5, 8, 25, 50, 250};
-
+uint32_t pokergame1::checkwin(uint32_t c1, uint32_t c2, uint32_t c3, uint32_t c4, uint32_t c5) {
     uint32_t cards[5];
     uint32_t colors[5];
     uint32_t numbers[5];
-    cards[0] = (uint32_t)itr_user->card1;
-    cards[1] = (uint32_t)itr_user->card2;
-    cards[2] = (uint32_t)itr_user->card3;
-    cards[3] = (uint32_t)itr_user->card4;
-    cards[4] = (uint32_t)itr_user->card5;
+    cards[0] = c1;
+    cards[1] = c2;
+    cards[2] = c3;
+    cards[3] = c4;
+    cards[4] = c5;
     sort(cards, cards + 5);
 
     colors[0] = cards[0] / 13;
@@ -542,70 +454,204 @@ void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, 
         finalratio = ratio[0];
         type = 0;
     }
-    pools.modify(itr_user, _self, [&](auto &p){
-        uint64_t b = p.bet * finalratio;
-        p.betwin = b;
-        p.wintype = type;
-    });
+    return type;
+}
 
-    uint32_t ratios[10] = {0, 1, 2, 3, 4, 5, 8, 25, 50, 250};
 
-    // records events if wintype >= straight
-    if (itr_user->wintype >= 4) {
-        events.emplace(_self, [&](auto &p){
-            p.id = events.available_primary_key();
-            p.owner = from;
-            p.datetime = now();
-            p.wintype = itr_user->wintype;
-            p.ratio = ratios[itr_user->wintype];
-            p.bet = itr_user->bet;
-            p.betwin = itr_user->betwin;
-            p.card1 = itr_user->card1;
-            p.card2 = itr_user->card2;
-            p.card3 = itr_user->card3;
-            p.card4 = itr_user->card4;
-            p.card5 = itr_user->card5;
-        });
-        eosio_assert(itr_metadata != metadatas.end(), "Metadata is empty.");
-        metadatas.modify(itr_metadata, _self, [&](auto &p){
-            p.eventcnt = p.eventcnt + 1;
-        });
+void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5, uint32_t mode) {
+    require_auth(from);
+
+    print("=======1=======");
+    auto itr_user = pools.find(from);
+    eosio_assert(itr_user != pools.end(), "User not found");
+    eosio_assert(itr_user->cardhash1.length() != 0, "Cards hasn't bee drawn.");
+    eosio_assert(itr_user->bet > 0, "Bet must be larger than zero.");
+    eosio_assert(itr_user->cardhash2.length() == 0, "New cards already assigned.");
+    eosio_assert(parsecard(dump1) == itr_user->card1, "card1 mismatch");
+    eosio_assert(parsecard(dump2) == itr_user->card2, "card2 mismatch");
+    eosio_assert(parsecard(dump3) == itr_user->card3, "card3 mismatch");
+    eosio_assert(parsecard(dump4) == itr_user->card4, "card4 mismatch");
+    eosio_assert(parsecard(dump5) == itr_user->card5, "card5 mismatch");
+
+
+    print("=======2=======");
+    auto itr_metadata = metadatas.find(0);
+    uint32_t arr[5];
+    bool barr[5];
+    std::set<uint32_t> myset;
+    myset.insert(itr_user->card1);
+    myset.insert(itr_user->card2);
+    myset.insert(itr_user->card3);
+    myset.insert(itr_user->card4);
+    myset.insert(itr_user->card5);
+
+    print("=======Get hash=======");
+    checksum256 roothash = gethash(from, externalsrc, itr_metadata->trounds);
+    string rhash;
+    char const hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+    for( int i = 0; i < 32; ++i )
+    {
+        char const byte = roothash.hash[i];
+        rhash += hex_chars[ ( byte & 0xF0 ) >> 4 ];
+        rhash += hex_chars[ ( byte & 0x0F ) >> 0 ];
     }
-    if (itr_metadata->eventcnt > 32) {
-        auto itr_event2 = events.begin();
-        events.erase(itr_event2);
-        metadatas.modify(itr_metadata, _self, [&](auto &p){
-            p.eventcnt = p.eventcnt - 1;
-        });
+
+    barr[0] = ishold(dump1) == true;
+    barr[1] = ishold(dump2) == true;
+    barr[2] = ishold(dump3) == true;
+    barr[3] = ishold(dump4) == true;
+    barr[4] = ishold(dump5) == true;
+
+    // find how many new cards we need to draw
+    uint32_t cnt = 0;
+    for (int i = 0; i < 5; i++) {
+        if (barr[i] != true) {
+            cnt++;
+        }
     }
 
+    print("=======Ready to draw cards=======count: ", cnt, "====");
+    uint32_t newarr[cnt];
+
+    if (mode != 5) {
+        getcards(from, roothash, newarr, cnt, myset, 0);
+        print("=======Got all cards=======");
+
+        if (barr[0] == false) {
+            pools.modify(itr_user, _self, [&](auto &p){
+                p.card1 = newarr[cnt++];
+            });
+        }
+        if (barr[1] == false) {
+            pools.modify(itr_user, _self, [&](auto &p){
+                p.card2 = newarr[cnt++];
+            });
+        }
+        if (barr[2] == false) {
+            pools.modify(itr_user, _self, [&](auto &p){
+                p.card3 = newarr[cnt++];
+            });
+        }
+        if (barr[3] == false) {
+            pools.modify(itr_user, _self, [&](auto &p){
+                p.card4 = newarr[cnt++];
+            });
+        }
+        if (barr[4] == false) {
+            pools.modify(itr_user, _self, [&](auto &p){
+                p.card5 = newarr[cnt++];
+            });
+        }
+        pools.modify(itr_user, _self, [&](auto &p){
+            p.cardhash2 = string(rhash);
+        });
+
+        print("=======ready to check win=======");
+        uint32_t type = checkwin(itr_user->card1, itr_user->card2, itr_user->card3, itr_user->card4, itr_user->card5);
+        print("=======check win=======");
+        pools.modify(itr_user, _self, [&](auto &p){
+            uint64_t b = p.bet * ratio[type];
+            p.betwin = b;
+            p.wintype = type;
+        });
+
+        // records events if wintype >= straight
+        if (itr_user->wintype >= 4) {
+            events.emplace(_self, [&](auto &p){
+                p.id = events.available_primary_key();
+                p.owner = from;
+                p.datetime = now();
+                p.wintype = itr_user->wintype;
+                p.ratio = ratio[itr_user->wintype];
+                p.bet = itr_user->bet;
+                p.betwin = itr_user->betwin;
+                p.card1 = itr_user->card1;
+                p.card2 = itr_user->card2;
+                p.card3 = itr_user->card3;
+                p.card4 = itr_user->card4;
+                p.card5 = itr_user->card5;
+            });
+            eosio_assert(itr_metadata != metadatas.end(), "Metadata is empty.");
+            metadatas.modify(itr_metadata, _self, [&](auto &p){
+                p.eventcnt = p.eventcnt + 1;
+            });
+        }
+        if (itr_metadata->eventcnt > 32) {
+            auto itr_event2 = events.begin();
+            events.erase(itr_event2);
+            metadatas.modify(itr_metadata, _self, [&](auto &p){
+                p.eventcnt = p.eventcnt - 1;
+            });
+        }
+
+        auto itr_typestat = typestats.find(itr_user->wintype);
+        typestats.modify(itr_typestat, _self, [&](auto &p) {
+            p.count += 1;
+        });
+        print("=======ha1=======");
+        char typemap[4] = {'S', 'C', 'H', 'D'};
+        string cc1 = to_string(itr_user->card1) + '[' + typemap[itr_user->card1 / 13] + to_string(itr_user->card1 % 13 + 1) + ']';
+        print("=======ha2=======");
+        string cc2 = to_string(itr_user->card2) + '[' + typemap[itr_user->card2 / 13] + to_string(itr_user->card2 % 13 + 1) + ']';
+        print("=======ha3=======");
+        string cc3 = to_string(itr_user->card3) + '[' + typemap[itr_user->card3 / 13] + to_string(itr_user->card3 % 13 + 1) + ']';
+        print("=======ha4=======");
+        string cc4 = to_string(itr_user->card4) + '[' + typemap[itr_user->card4 / 13] + to_string(itr_user->card4 % 13 + 1) + ']';
+        print("=======ha5=======");
+        string cc5 = to_string(itr_user->card5) + '[' + typemap[itr_user->card5 / 13] + to_string(itr_user->card5 % 13 + 1) + ']';
+        print("=======ha6=======");
+        string cbet = to_string(itr_user->bet / 10000) + '.' + to_string(itr_user->bet % 10000) + " EOS";
+        string cbetwin = to_string(itr_user->betwin / 10000) + '.' + to_string(itr_user->betwin % 10000) + " EOS";
+        print("=======here=======");
+        action(permission_level{_self, N(active)}, N(eosvegasjack), N(dealreceipt),
+               std::make_tuple(from, string(itr_user->cardhash1), string(itr_user->cardhash2), string(cc1), string(cc2),
+                               string(cc3), string(cc4), string(cc5), string(cbet),
+                               string(cbetwin), itr_user->bet, itr_user->betwin, string("x1 mode"), string(cbetwin),
+                               string(" "), string(" "), string(" "), string(" ")))
+                .send();
+    } else {
+
+        checksum256 lasthash = roothash;
+        for(uint32_t i = 0; i < 5; ++i)  {
+            myset.clear();
+            myset.insert(itr_user->card1);
+            myset.insert(itr_user->card2);
+            myset.insert(itr_user->card3);
+            myset.insert(itr_user->card4);
+            myset.insert(itr_user->card5);
+
+//            getcards(from, lasthash, c[i], cnt, myset, 0);
+
+            checksum256 newhash;
+            sha256((char *)&lasthash.hash, 32, &newhash);
+            lasthash = newhash;
+
+
+        }
+    }
+    print("======wow======");
+    cnt = 0;
+
+    uint64_t cards1 = 0;
+    uint64_t cards2 = 0;
+    uint64_t cards3 = 0;
+    uint64_t cards4 = 0;
+    uint64_t cards5 = 0;
+
+    uint64_t minemev;
+    uint64_t meosin;
+    uint64_t meosout;
     uint64_t mineprice = getminingtableprice(itr_metadata->teosin);
-    uint64_t minemev = itr_user->bet * mineprice / 100;
-    uint64_t meosin = itr_user->bet;
-    uint64_t meosout = itr_user->betwin;
+    if (mode != 5) {
+        minemev = itr_user->bet * mineprice / 100;
+        meosin = itr_user->bet;
+        meosout = itr_user->betwin;
+    } else {
 
+    }
     report(from, minemev, meosin, meosout);
-    auto itr_typestat = typestats.find(itr_user->wintype);
-    typestats.modify(itr_typestat, _self, [&](auto &p) {
-        p.count += 1;
-    });
 
-    char typemap[4] = {'S', 'C', 'H', 'D'};
-    string cc1 = to_string(itr_user->card1) + '[' + typemap[itr_user->card1 / 13] + to_string(itr_user->card1 % 13 + 1) + ']';
-    string cc2 = to_string(itr_user->card2) + '[' + typemap[itr_user->card2 / 13] + to_string(itr_user->card2 % 13 + 1) + ']';
-    string cc3 = to_string(itr_user->card3) + '[' + typemap[itr_user->card3 / 13] + to_string(itr_user->card3 % 13 + 1) + ']';
-    string cc4 = to_string(itr_user->card4) + '[' + typemap[itr_user->card4 / 13] + to_string(itr_user->card4 % 13 + 1) + ']';
-    string cc5 = to_string(itr_user->card5) + '[' + typemap[itr_user->card5 / 13] + to_string(itr_user->card5 % 13 + 1) + ']';
-    string cbet = to_string(itr_user->bet / 10000) + '.' + to_string(itr_user->bet % 10000) + " EOS";
-    string cbetwin = to_string(itr_user->betwin / 10000) + '.' + to_string(itr_user->betwin % 10000) + " EOS";
-
-    action(permission_level{_self, N(active)}, N(eosvegasjack), N(dealreceipt),
-            std::make_tuple(from, string(itr_user->cardhash1), string(itr_user->cardhash2), string(cc1), string(cc2),
-                    string(cc3), string(cc4), string(cc5), string(cbet),
-                   string(cbetwin), itr_user->bet, itr_user->betwin))
-            .send();
-
-    asset bal = asset(itr_user->betwin, symbol_type(S(4, EOS)));
+    asset bal = asset(meosout, symbol_type(S(4, EOS)));
     if (bal.amount > 0) {
         // withdraw
         action(permission_level{_self, N(active)}, N(eosio.token),
@@ -730,8 +776,8 @@ void pokergame1::clear() {
 
 void pokergame1::init() {
     require_auth(_self);
+/*/
 
-    /*
     auto itr3 = metadatas.begin();
     auto itr_metadata = metadatas.emplace(_self, [&](auto &p){
         p.eventcnt = 0;
@@ -743,14 +789,16 @@ void pokergame1::init() {
         p.teosout = 0;
         p.trounds = 0;
     });
+    */
     auto itr4 = secrets.begin();
     //int bnum = tapos_block_num();
-    for( int i = 256; i < 1024; ++i ) {
+    for( int i = 0; i < 1024; ++i ) {
         secrets.emplace(_self, [&](auto &p) {
             p.id = i;
             p.s1 = current_time() + 7 * i;
         });
     }
+    /*
     auto itr5 = cardstats.begin();
     for( int i = 0; i < 52; ++i ) {
         cardstats.emplace(_self, [&](auto &p) {
@@ -766,7 +814,7 @@ void pokergame1::init() {
             p.count = 0;
         });
     }
-    */
+*/
 }
 
 void pokergame1::setgameon(uint64_t id, uint32_t flag) {
