@@ -42,12 +42,16 @@ public:
              ginfos(_self, _self),
              gaccounts(_self, _self),
              cardstats(_self, _self),
-             typestats(_self, _self){};
+             typestats(_self, _self),
+             paccounts(_self, _self){};
 
     //@abi action
     void dealreceipt(const name from, string hash1, string hash2, string card1, string card2, string card3, string card4, string card5, string betineos, string winineos, uint64_t betnum, uint64_t winnum);
     //@abi action
     void drawcards(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5);
+    //@abi action
+    void drawcards5x(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5);
+
     //@abi action
     void clear();
     //@abi action
@@ -62,6 +66,8 @@ public:
     void setgameon(uint64_t id, uint32_t flag);
     //@abi action
     void setminingon(uint64_t id, uint32_t flag);
+    //@abi action
+    void getbonus(const name from, const uint32_t type, uint32_t externalsrc);
     //@abi action
     void signup(const name from, const string memo);
     checksum256 gethash(account_name from, uint32_t externalsrc, uint32_t rounds);
@@ -116,6 +122,47 @@ private:
 
         EOSLIB_SERIALIZE(st_pools, (owner)(referrer)(status)(card1)(card2)(card3)(card4)(card5)(wintype)(betcurrency)(bet)(betwin)(userseed)(cardhash1)(cardhash2))
     };
+
+/*
+
+    // @abi table pool5xs i64
+    struct st_pool5xs {
+        name owner;
+        uint64_t cards1;
+        uint64_t cards2;
+        uint64_t cards3;
+        uint64_t cards4;
+        uint64_t cards5;
+        uint64_t wintype;
+        uint32_t betcurrency;
+        uint64_t bet;
+        uint64_t betwin;
+        uint64_t userseed;
+        string cardhash1;
+        string cardhash2;
+
+        uint64_t primary_key() const { return owner; }
+
+        EOSLIB_SERIALIZE(st_pool5xs, (owner)(referrer)(status)(card1)(card2)(card3)(card4)(card5)(wintype)(betcurrency)(bet)(betwin)(userseed)(cardhash1)(cardhash2))
+    };
+*/
+
+
+    // @abi table paccounts i64
+    struct st_paccounts {
+        name owner;
+        uint32_t level;
+        uint64_t exp;
+        uint32_t lastbonus;
+        uint32_t lastseen;
+        uint32_t logins;    // continuous login days
+        uint64_t bonusnumber;
+
+        uint64_t primary_key() const { return owner; }
+
+        EOSLIB_SERIALIZE(st_paccounts, (owner)(level)(exp)(lastbonus)(lastseen)(logins)(bonusnumber))
+    };
+
 
     // @abi table events i64
     struct st_events {
@@ -215,4 +262,6 @@ private:
     _tb_cardstats cardstats;
     typedef multi_index<N(typestats), st_typestats> _tb_typestats;
     _tb_typestats typestats;
+    typedef multi_index<N(paccounts), st_paccounts> _tb_paccounts;
+    _tb_paccounts paccounts;
 };
