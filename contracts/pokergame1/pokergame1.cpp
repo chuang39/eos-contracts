@@ -12,11 +12,26 @@ uint64_t miningtable[5][2] = {{400000000000, 400}, // 1EOS 4MEV
                                {400000000000 * 4, 50}, // 2EOS 1MEV
                                {400000000000 * 5, 10} // 10EOS 1MEV
                               };
+
+uint64_t exptable[15] = {500000, 3000000, 9000000, 21000000, 61000000, 208500000, 654500000, 1783000000, 4279500000,
+                         9269500000, 18490500000, 34500000000, 60922000000, 102736000000, 166608500000};
+
+
 // check if the player wins or not
 uint32_t ratios[10] = {0, 1, 2, 3, 4, 5, 8, 25, 50, 250};
 const uint32_t starttime = 1537833600; // 18/09/25 00:00:00 UTC
 const uint32_t wstarttime = 1537747200; //GMT: Monday, September 24, 2018 12:00:00 AM
 uint64_t mstarttimes[5] = {1535760000, 1538352000, 1541030400, 1543622400, 1546300800};
+
+uint32_t getlevel(uint64_t teosin) {
+    uint64_t totalexp = teosin * 50;
+    for (int i = 0; i < 15; i++) {
+        if (totalexp < exptable[i]) {
+            return i;
+        }
+    }
+    return 15;
+}
 
 uint64_t getminingtableprice(uint64_t sold_keys) {
     for (int i = 0; i < 5; i++) {
@@ -255,6 +270,28 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         p.betwin = 0;
         p.wintype = 0;
     });
+
+    auto itr_paccount = paccounts.find(user);
+    if (itr_paccount == paccounts.end()) {
+        paccounts.emplace(_self, [&](auto &p){
+            p.owner = name{user};
+            uint32_t nextlev = getlevel(amount);
+            p.level = nextlev;
+            p.exp = amount * 50;
+        });
+    } else {
+        uint64_t userteosin = 0;
+        auto itr_gacnt = gaccounts.find(user);
+        if (itr_gacnt != gaccounts.end()) {
+            userteosin = itr_gacnt->teosin;
+        }
+
+        paccounts.modify(itr_paccount, _self, [&](auto &p) {
+            uint32_t nextlev = getlevel(userteosin + amount);
+            p.level = nextlev;
+            p.exp += amount * 50;
+        });
+    }
 }
 
 void pokergame1::report(name from, uint64_t minemev, uint64_t meosin, uint64_t meosout) {
@@ -719,7 +756,10 @@ uint32_t pokergame1::parsecard(string s) {
 }
 
 void pokergame1::clear() {
+
     require_auth(_self);
+
+    /*
     auto itr = pools.begin();
     while (itr != pools.end()) {
         itr = pools.erase(itr);
@@ -753,17 +793,61 @@ void pokergame1::clear() {
     while (itr8 != typestats.end()) {
         itr8 = typestats.erase(itr8);
     }
+
+    auto itr9 = paccounts.begin();
+    while (itr9 != paccounts.end()) {
+        itr9 = paccounts.erase(itr9);
+    }
+          */
 }
+
+
+
 
 void pokergame1::init() {
     require_auth(_self);
 
-    //for (auto itr = st_gaccounts.begin(); itr != pools.end(); itr++) {
+    /*
+    int cnt = 0;
+    auto itr = gaccounts.begin();
+    for (int i = 0; i < 125; i++) {
+        itr++;
+    }
+    while (cnt < 25 && itr != gaccounts.end()) {
+        uint32_t lev = getlevel(itr->teosin);
+        auto itr_paccount = paccounts.emplace(_self, [&](auto &p){
+            p.owner = itr->owner;
+            p.level = lev;
+            p.exp = itr->teosin * 50;
+        });
 
+        cnt++;
+        itr++;
+    }
+     */
+    /*
+    uint32_t cnt = 0;
+    for (auto itr = gaccounts.begin();  cnt < ; itr++) {
+        uint32_t lev = getlevel(itr->teosin);
 
+        auto itr_paccount = paccounts.find(itr->owner);
+        if (itr_paccount == paccounts.end()) {
+            auto itr_paccount = paccounts.emplace(_self, [&](auto &p){
+                p.owner = itr->owner;
+                p.level = lev;
+                p.exp = itr->teosin * 50;
+            });
+        }
 
-
-    //}
+        cnt++;
+        */
+        /*else {
+            paccounts.modify(itr_paccount, _self, [&](auto &p) {
+                p.level = lev;
+                p.exp = itr->teosin * 50;
+            });
+        }
+    }*/
 
 
 

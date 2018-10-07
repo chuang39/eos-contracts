@@ -157,10 +157,11 @@ private:
         uint32_t lastseen;
         uint32_t logins;    // continuous login days
         uint64_t bonusnumber;
+        uint64_t bonustype;
 
         uint64_t primary_key() const { return owner; }
 
-        EOSLIB_SERIALIZE(st_paccounts, (owner)(level)(exp)(lastbonus)(lastseen)(logins)(bonusnumber))
+        EOSLIB_SERIALIZE(st_paccounts, (owner)(level)(exp)(lastbonus)(lastseen)(logins)(bonusnumber)(bonustype))
     };
 
 
