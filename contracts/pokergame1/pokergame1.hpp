@@ -47,9 +47,10 @@ public:
 
     //@abi action
     void dealreceipt(const name from, string hash1, string hash2, string card1, string card2, string card3, string card4,
-            string card5, string betineos, string winineos, uint64_t betnum, uint64_t winnum);
+            string card5, string betineos, string winineos, uint64_t betnum, uint64_t winnum, string mode,
+            string pay1, string pay2, string pay3, string pay4, string p5);
     //@abi action
-    void drawcards(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5);
+    void drawcards(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5, uint32_t mode);
     //@abi action
     void clear();
     //@abi action
