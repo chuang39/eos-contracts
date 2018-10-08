@@ -436,7 +436,12 @@ void pokergame1::report(name from, uint64_t minemev, uint64_t meosin, uint64_t m
 
 void pokergame1::dealreceipt(const name from, string hash1, string hash2, string card1, string card2, string card3, string card4, string card5, string betineos, string winineos, uint64_t betnum, uint64_t winnum) {
     require_auth(_self);
-    require_recipient( from );
+    require_recipient(from);
+}
+
+void pokergame1::receipt5x(const name from, string game, string hash1, string hash2, string cards1, string cards2, string cards3, string cards4, string cards5, string results, string betineos, string winineos) {
+    require_auth(_self);
+    require_recipient(from);
 }
 
 
@@ -504,22 +509,207 @@ uint32_t pokergame1::checkwin(uint32_t c1, uint32_t c2, uint32_t c3, uint32_t c4
 void pokergame1::drawcards5x(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5) {
     require_auth(from);
 
-    auto itr_user = pools.find(from);
-    eosio_assert(itr_user != pools.end(), "User not found");
-    eosio_assert(itr_user->cardhash1.length() != 0, "Cards hasn't bee drawn.");
-    eosio_assert(itr_user->bet > 0, "Bet must be larger than zero.");
-    eosio_assert(itr_user->cardhash2.length() == 0, "New cards already assigned.");
-    eosio_assert(parsecard(dump1) == itr_user->card1, "card1 mismatch");
-    eosio_assert(parsecard(dump2) == itr_user->card2, "card2 mismatch");
-    eosio_assert(parsecard(dump3) == itr_user->card3, "card3 mismatch");
-    eosio_assert(parsecard(dump4) == itr_user->card4, "card4 mismatch");
-    eosio_assert(parsecard(dump5) == itr_user->card5, "card5 mismatch");
+    auto itr_pool = pools.find(from);
+    eosio_assert(itr_pool != pools.end(), "User not found");
+    eosio_assert(itr_pool->cardhash1.length() != 0, "Cards hasn't bee drawn.");
+    eosio_assert(itr_pool->bet > 0, "Bet must be larger than zero.");
+    eosio_assert(itr_pool->cardhash2.length() == 0, "New cards already assigned.");
+    eosio_assert(parsecard(dump1) == itr_pool->card1, "card1 mismatch");
+    eosio_assert(parsecard(dump2) == itr_pool->card2, "card2 mismatch");
+    eosio_assert(parsecard(dump3) == itr_pool->card3, "card3 mismatch");
+    eosio_assert(parsecard(dump4) == itr_pool->card4, "card4 mismatch");
+    eosio_assert(parsecard(dump5) == itr_pool->card5, "card5 mismatch");
 
     auto itr_metadata = metadatas.find(0);
-    uint32_t arr[5];
-    bool barr[5];
-    std::set<uint32_t> myset;
 
+
+    std::set<uint32_t> myset;
+    bool barr[5];
+    barr[0] = ishold(dump1) == true;
+    barr[1] = ishold(dump2) == true;
+    barr[2] = ishold(dump3) == true;
+    barr[3] = ishold(dump4) == true;
+    barr[4] = ishold(dump5) == true;
+
+    checksum256 roothash = gethash(from, externalsrc, itr_metadata->trounds);
+    string rhash;
+    char const hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+    for( int i = 0; i < 32; ++i )
+    {
+        char const byte = roothash.hash[i];
+        rhash += hex_chars[ ( byte & 0xF0 ) >> 4 ];
+        rhash += hex_chars[ ( byte & 0x0F ) >> 0 ];
+    }
+    pools.modify(itr_pool, _self, [&](auto &p){
+        p.cardhash2 = string(rhash);
+    });
+
+
+    // find how many new cards we need to draw
+    uint32_t cnt = 0;
+    for (int i = 0; i < 5; i++) {
+        if (barr[i] != true) {
+            cnt++;
+        }
+    }
+    uint32_t newarr[cnt];   // new cards we final get for each round
+    uint64_t eachbet = itr_pool->bet / 5;
+    uint64_t ebetwin[5];
+    uint64_t tbetwin = 0;
+    uint64_t twintype = 0;
+    string tresult;
+    uint64_t newcards[5];
+    string newcardsstr[5];
+    // 5 card sets
+    for (int i = 0; i < 5; i++) {
+        myset.clear();
+        myset.insert(itr_pool->card1);
+        myset.insert(itr_pool->card2);
+        myset.insert(itr_pool->card3);
+        myset.insert(itr_pool->card4);
+        myset.insert(itr_pool->card5);
+
+        getcards(from, roothash, newarr, cnt, myset, 0);
+
+        checksum256 newhash;
+        sha256((char *)&roothash.hash, 32, &newhash);
+        roothash = newhash;
+
+        cnt = 0;
+
+        uint32_t n1 = barr[0] == false ? newarr[cnt++] : itr_pool->card1;
+        newcards[i] |= n1;
+        newcards[i] <<= 8;
+        newcardsstr[i] = to_string(n1) + ", ";
+
+        uint32_t n2 = barr[1] == false ? newarr[cnt++] : itr_pool->card2;
+        newcards[i] |= n2;
+        newcards[i] <<= 8;
+        newcardsstr[i] = to_string(n2) + ", ";
+
+        uint32_t n3 = barr[2] == false ? newarr[cnt++] : itr_pool->card3;
+        newcards[i] |= n2;
+        newcards[i] <<= 8;
+        newcardsstr[i] = to_string(n3) + ", ";
+
+        uint32_t n4 = barr[3] == false ? newarr[cnt++] : itr_pool->card4;
+        newcards[i] |= n2;
+        newcards[i] <<= 8;
+        newcardsstr[i] = to_string(n4) + ", ";
+
+        uint32_t n5 = barr[4] == false ? newarr[cnt++] : itr_pool->card5;
+        newcards[i] |= n2;
+        newcardsstr[i] = to_string(n5);
+
+        uint32_t type = checkwin(n1, n2, n3, n4, n5);
+        twintype <<= 8;
+        twintype |= type;
+        ebetwin[i] = eachbet * ratios[type];
+        tbetwin += ebetwin[i];
+        tresult = " X" + to_string(ratios[type]);
+
+        // print("=====card:",n1,"=====",n2,"=====",n3,"=====",n4,"=====",n5);
+        // print("=====wintype:", type);
+
+        // records events if wintype >= straight
+        if (type >= 4) {
+            events.emplace(_self, [&](auto &p){
+                p.id = events.available_primary_key();
+                p.owner = from;
+                p.datetime = now();
+                p.wintype = type;
+                p.ratio = ratios[type];
+                p.bet = eachbet;
+                p.betwin = ebetwin[i];
+                p.card1 = n1;
+                p.card2 = n2;
+                p.card3 = n3;
+                p.card4 = n4;
+                p.card5 = n5;
+            });
+            eosio_assert(itr_metadata != metadatas.end(), "Metadata is empty.");
+            metadatas.modify(itr_metadata, _self, [&](auto &p){
+                p.eventcnt = p.eventcnt + 1;
+            });
+        }
+
+        auto itr_typestat = typestats.find(type);
+        typestats.modify(itr_typestat, _self, [&](auto &p) {
+            p.count += 1;
+        });
+    }
+
+    while (itr_metadata->eventcnt > 32) {
+        auto itr_event2 = events.begin();
+        events.erase(itr_event2);
+        metadatas.modify(itr_metadata, _self, [&](auto &p){
+            p.eventcnt = p.eventcnt - 1;
+        });
+    }
+
+    auto itr_pool5x = pool5xs.find(from);
+    if (itr_pool5x == pool5xs.end()) {
+        itr_pool5x = pool5xs.emplace(_self, [&](auto &p){
+            p.owner = from;
+            p.cards1 = newcards[0];
+            p.cards2 = newcards[1];
+            p.cards3 = newcards[2];
+            p.cards4 = newcards[3];
+            p.cards5 = newcards[4];
+            p.wintype =twintype;
+            p.betwin1 = ebetwin[0];
+            p.betwin2 = ebetwin[1];
+            p.betwin3 = ebetwin[2];
+            p.betwin4 = ebetwin[3];
+            p.betwin5 = ebetwin[4];
+        });
+    } else {
+        pool5xs.modify(itr_pool5x, _self, [&](auto &p){
+            p.cards1 = newcards[0];
+            p.cards2 = newcards[1];
+            p.cards3 = newcards[2];
+            p.cards4 = newcards[3];
+            p.cards5 = newcards[4];
+            p.wintype =twintype;
+            p.betwin1 = ebetwin[0];
+            p.betwin2 = ebetwin[1];
+            p.betwin3 = ebetwin[2];
+            p.betwin4 = ebetwin[3];
+            p.betwin5 = ebetwin[4];
+        });
+    }
+
+    uint64_t mineprice = getminingtableprice(itr_metadata->teosin);
+    uint64_t minemev = itr_pool->bet * mineprice / 100;
+    uint64_t meosin = itr_pool->bet;
+    uint64_t meosout = tbetwin;
+
+    report(from, minemev, meosin, meosout);
+
+    string cbet = to_string(meosin / 10000) + '.' + to_string(meosin % 10000) + " EOS";
+    string cbetwin = to_string(meosout / 10000) + '.' + to_string(meosout % 10000) + " EOS";
+
+    action(permission_level{_self, N(active)}, N(eosvegasjack), N(receipt5x),
+           std::make_tuple(from, string("Jack-or-Better 5X"), string(itr_pool->cardhash1), string(itr_pool->cardhash2),
+                   string(newcardsstr[0]), string(newcardsstr[1]),
+                           string(newcardsstr[2]), string(newcardsstr[3]), string(newcardsstr[4]), string(tresult),
+                           string(cbet), string(cbetwin)))
+            .send();
+
+    asset bal = asset(meosout, symbol_type(S(4, EOS)));
+    if (bal.amount > 0) {
+        // withdraw
+        action(permission_level{_self, N(active)}, N(eosio.token),
+               N(transfer), std::make_tuple(_self, from, bal,
+                                            std::string("Winner winner chicken dinner! - jacks.MyEosVegas.com")))
+                .send();
+    }
+
+    asset bal2 = asset(minemev, symbol_type(S(4, MEV)));
+    action(permission_level{_self, N(active)}, N(eosvegascoin),
+           N(transfer), std::make_tuple(N(eosvegasjack), from, bal2,
+                                        std::string("Gaming deserves rewards!")))
+            .send();
 
 }
 
@@ -538,7 +728,6 @@ void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, 
     eosio_assert(parsecard(dump5) == itr_user->card5, "card5 mismatch");
 
     auto itr_metadata = metadatas.find(0);
-    uint32_t arr[5];
     bool barr[5];
     std::set<uint32_t> myset;
     myset.insert(itr_user->card1);
@@ -635,7 +824,7 @@ void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, 
             p.eventcnt = p.eventcnt + 1;
         });
     }
-    if (itr_metadata->eventcnt > 32) {
+    while (itr_metadata->eventcnt > 32) {
         auto itr_event2 = events.begin();
         events.erase(itr_event2);
         metadatas.modify(itr_metadata, _self, [&](auto &p){
@@ -793,12 +982,12 @@ void pokergame1::clear() {
     while (itr8 != typestats.end()) {
         itr8 = typestats.erase(itr8);
     }
-
+          */
     auto itr9 = paccounts.begin();
     while (itr9 != paccounts.end()) {
         itr9 = paccounts.erase(itr9);
     }
-          */
+
 }
 
 
@@ -1011,4 +1200,4 @@ extern "C" { \
 }
 
 //EOSIO_ABI_EX(pokergame1, (dealreceipt)(drawcards)(clear)(setseed)(setcards)(init)(setgameon)(setminingon)(signup))
-EOSIO_ABI_EX(pokergame1, (dealreceipt)(drawcards)(clear)(setseed)(init)(setgameon)(setminingon)(signup)(getbonus))
+EOSIO_ABI_EX(pokergame1, (dealreceipt)(receipt5x)(drawcards)(drawcards5x)(clear)(setseed)(init)(setgameon)(setminingon)(signup)(getbonus))

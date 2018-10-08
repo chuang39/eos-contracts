@@ -43,10 +43,14 @@ public:
              gaccounts(_self, _self),
              cardstats(_self, _self),
              typestats(_self, _self),
-             paccounts(_self, _self){};
+             paccounts(_self, _self),
+             pool5xs(_self, _self){};
 
     //@abi action
     void dealreceipt(const name from, string hash1, string hash2, string card1, string card2, string card3, string card4, string card5, string betineos, string winineos, uint64_t betnum, uint64_t winnum);
+    //@abi action
+    void receipt5x(const name from, string game, string hash1, string hash2, string cards1, string cards2, string cards3, string cards4, string cards5, string results, string betineos, string winineos);
+
     //@abi action
     void drawcards(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5);
     //@abi action
@@ -123,8 +127,6 @@ private:
         EOSLIB_SERIALIZE(st_pools, (owner)(referrer)(status)(card1)(card2)(card3)(card4)(card5)(wintype)(betcurrency)(bet)(betwin)(userseed)(cardhash1)(cardhash2))
     };
 
-/*
-
     // @abi table pool5xs i64
     struct st_pool5xs {
         name owner;
@@ -134,18 +136,16 @@ private:
         uint64_t cards4;
         uint64_t cards5;
         uint64_t wintype;
-        uint32_t betcurrency;
-        uint64_t bet;
-        uint64_t betwin;
-        uint64_t userseed;
-        string cardhash1;
-        string cardhash2;
+        uint64_t betwin1;
+        uint64_t betwin2;
+        uint64_t betwin3;
+        uint64_t betwin4;
+        uint64_t betwin5;
 
         uint64_t primary_key() const { return owner; }
 
-        EOSLIB_SERIALIZE(st_pool5xs, (owner)(referrer)(status)(card1)(card2)(card3)(card4)(card5)(wintype)(betcurrency)(bet)(betwin)(userseed)(cardhash1)(cardhash2))
+        EOSLIB_SERIALIZE(st_pool5xs, (owner)(cards1)(cards2)(cards3)(cards4)(cards5)(wintype)(betwin1)(betwin2)(betwin3)(betwin4)(betwin5))
     };
-*/
 
 
     // @abi table paccounts i64
@@ -251,6 +251,8 @@ private:
     _tb_metadatas metadatas;
     typedef multi_index<N(pools), st_pools> _tb_pools;
     _tb_pools pools;
+    typedef multi_index<N(pool5xs), st_pool5xs> _tb_pool5xs;
+    _tb_pool5xs pool5xs;
     typedef multi_index<N(events), st_events> _tb_events;
     _tb_events events;
     typedef multi_index<N(secrets), st_secrets> _tb_secrets;
