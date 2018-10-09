@@ -595,31 +595,28 @@ void pokergame1::drawcards5x(const name from, uint32_t externalsrc, string dump1
         uint32_t n2 = barr[1] == false ? newarr[newcnt++] : itr_pool->card2;
         newcards[i] |= n2;
         newcards[i] <<= 8;
-        newcardsstr[i] = to_string(n2) + ", ";
+        newcardsstr[i] = newcardsstr[i] + to_string(n2) + ", ";
 
         uint32_t n3 = barr[2] == false ? newarr[newcnt++] : itr_pool->card3;
         newcards[i] |= n3;
         newcards[i] <<= 8;
-        newcardsstr[i] = to_string(n3) + ", ";
+        newcardsstr[i] = newcardsstr[i] + to_string(n3) + ", ";
 
         uint32_t n4 = barr[3] == false ? newarr[newcnt++] : itr_pool->card4;
         newcards[i] |= n4;
         newcards[i] <<= 8;
-        newcardsstr[i] = to_string(n4) + ", ";
+        newcardsstr[i] = newcardsstr[i] + to_string(n4) + ", ";
 
         uint32_t n5 = barr[4] == false ? newarr[newcnt++] : itr_pool->card5;
         newcards[i] |= n5;
-        newcardsstr[i] = to_string(n5);
+        newcardsstr[i] = newcardsstr[i] + to_string(n5);
 
         uint32_t type = checkwin(n1, n2, n3, n4, n5);
         twintype <<= 8;
         twintype |= type;
         ebetwin[i] = eachbet * ratios[type];
         tbetwin += ebetwin[i];
-        tresult = " X" + to_string(ratios[type]);
-
-        // print("=====card:",n1,"=====",n2,"=====",n3,"=====",n4,"=====",n5);
-        // print("=====wintype:", type);
+        tresult = tresult + " X" + to_string(ratios[type]);
 
         // records events if wintype >= straight
         if (type >= 4) {
