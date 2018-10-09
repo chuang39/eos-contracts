@@ -531,6 +531,7 @@ void pokergame1::drawcards5x(const name from, uint32_t externalsrc, string dump1
     eosio_assert(parsecard(dump5) == itr_pool->card5, "card5 mismatch");
 
     auto itr_metadata = metadatas.find(0);
+    auto itr_paccount = paccounts.find(from);
 
 
     std::set<uint32_t> myset;
@@ -687,7 +688,7 @@ void pokergame1::drawcards5x(const name from, uint32_t externalsrc, string dump1
     }
 
     uint64_t mineprice = getminingtableprice(itr_metadata->teosin);
-    uint64_t minemev = itr_pool->bet * mineprice / 100;
+    uint64_t minemev = itr_pool->bet * mineprice * (1 + itr_paccount->level * 0.05) / 100;
     uint64_t meosin = itr_pool->bet;
     uint64_t meosout = tbetwin;
 
@@ -735,6 +736,7 @@ void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, 
     eosio_assert(parsecard(dump5) == itr_user->card5, "card5 mismatch");
 
     auto itr_metadata = metadatas.find(0);
+    auto itr_paccount = paccounts.find(from);
     bool barr[5];
     std::set<uint32_t> myset;
     myset.insert(itr_user->card1);
@@ -840,7 +842,7 @@ void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, 
     }
 
     uint64_t mineprice = getminingtableprice(itr_metadata->teosin);
-    uint64_t minemev = itr_user->bet * mineprice / 100;
+    uint64_t minemev = itr_user->bet * mineprice * (1 + itr_paccount->level * 0.05)  / 100;
     uint64_t meosin = itr_user->bet;
     uint64_t meosout = itr_user->betwin;
 
@@ -1141,22 +1143,42 @@ void pokergame1::getbonus(const name from, const uint32_t type, uint32_t externa
         p.lastbonus = curtime;
         p.bonusnumber = num;
     });
-/*
 
-    asset bal = asset(itr_user->betwin, symbol_type(S(4, EOS)));
-    if (bal.amount > 0) {
-        // withdraw
-        action(permission_level{_self, N(active)}, N(eosio.token),
-               N(transfer), std::make_tuple(_self, from, bal,
-                                            std::string("Winner winner chicken dinner! - jacks.MyEosVegas.com")))
-                .send();
+    uint32_t btype = 0;
+    uint64_t bamount = 0;
+    if (num <= 5000 ) {
+        bamount = 5;
+    } else if (num > 5000 && num <= 9885) {
+        bamount = 10000;
+        btype = 1;
+    } else if (num > 9885 && num <= 9935) {
+        bamount = 50;
+    } else if (num > 9935 && num <= 9985){
+        bamount = 200000;
+        btype = 1;
+    } else if (num > 9985 && num <= 9990) {
+        bamount = 500;
+    }  else if (num > 9991 && num <= 9996) {
+        bamount = 1000000;
+        btype = 1;
+    } else {
+        bamount = 5000;
     }
-*/
-    asset bal2 = asset(1, symbol_type(S(4, MEV)));
-    action(permission_level{_self, N(active)}, N(eosvegascoin),
-           N(transfer), std::make_tuple(N(eosvegasjack), from, bal2,
-                                        std::string("Login bonus!")))
-            .send();
+
+    if (btype == 1) {
+        asset bal2 = asset(bamount, symbol_type(S(4, MEV)));
+        action(permission_level{_self, N(active)}, N(eosvegascoin),
+               N(transfer), std::make_tuple(N(eosvegasjack), from, bal2,
+                                            std::string("Welcome! Daily bonus to enjoy the game @ MyEosVegas.com!")))
+                .send();
+    } else {
+        asset bal = asset(bamount, symbol_type(S(4, EOS)));
+            action(permission_level{_self, N(active)}, N(eosio.token),
+                N(transfer), std::make_tuple(_self, from, bal,
+                                            std::string("Welcome! Daily bonus to enjoy the game @ MyEosVegas.com!")))
+                .send();
+
+    }
 }
 
 /*
