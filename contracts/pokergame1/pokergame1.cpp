@@ -211,7 +211,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
     eosio_assert(t.quantity.amount > 0, "Quantity must be positive");
 
     string usercomment = t.memo;
-    uint32_t gameid = 1;    // 1: jacks-or-better; 2: jacks-or-better 5x
+    uint32_t gameid = 0;    // 0: jacks-or-better; 1: jacks-or-better 5x
     if (usercomment.find("type[") == 0) {
         uint32_t pos = usercomment.find("]");
         if (pos > 0) {
@@ -219,7 +219,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
             gameid = stoi(ucm);
         }
     }
-    eosio_assert((gameid == 1 || gameid == 2), "Non-recognized game id");
+    eosio_assert((gameid == 0 || gameid == 1), "Non-recognized game id");
 
     auto itr_metadata = metadatas.begin();
     eosio_assert(itr_metadata != metadatas.end(), "No game is found.");
@@ -585,30 +585,30 @@ void pokergame1::drawcards5x(const name from, uint32_t externalsrc, string dump1
         sha256((char *)&roothash.hash, 32, &newhash);
         roothash = newhash;
 
-        cnt = 0;
+        uint32_t newcnt = 0;
 
-        uint32_t n1 = barr[0] == false ? newarr[cnt++] : itr_pool->card1;
+        uint32_t n1 = barr[0] == false ? newarr[newcnt++] : itr_pool->card1;
         newcards[i] |= n1;
         newcards[i] <<= 8;
         newcardsstr[i] = to_string(n1) + ", ";
 
-        uint32_t n2 = barr[1] == false ? newarr[cnt++] : itr_pool->card2;
+        uint32_t n2 = barr[1] == false ? newarr[newcnt++] : itr_pool->card2;
         newcards[i] |= n2;
         newcards[i] <<= 8;
         newcardsstr[i] = to_string(n2) + ", ";
 
-        uint32_t n3 = barr[2] == false ? newarr[cnt++] : itr_pool->card3;
-        newcards[i] |= n2;
+        uint32_t n3 = barr[2] == false ? newarr[newcnt++] : itr_pool->card3;
+        newcards[i] |= n3;
         newcards[i] <<= 8;
         newcardsstr[i] = to_string(n3) + ", ";
 
-        uint32_t n4 = barr[3] == false ? newarr[cnt++] : itr_pool->card4;
-        newcards[i] |= n2;
+        uint32_t n4 = barr[3] == false ? newarr[newcnt++] : itr_pool->card4;
+        newcards[i] |= n4;
         newcards[i] <<= 8;
         newcardsstr[i] = to_string(n4) + ", ";
 
-        uint32_t n5 = barr[4] == false ? newarr[cnt++] : itr_pool->card5;
-        newcards[i] |= n2;
+        uint32_t n5 = barr[4] == false ? newarr[newcnt++] : itr_pool->card5;
+        newcards[i] |= n5;
         newcardsstr[i] = to_string(n5);
 
         uint32_t type = checkwin(n1, n2, n3, n4, n5);
@@ -992,12 +992,12 @@ void pokergame1::clear() {
     while (itr8 != typestats.end()) {
         itr8 = typestats.erase(itr8);
     }
-          */
     auto itr9 = paccounts.begin();
     while (itr9 != paccounts.end()) {
         itr9 = paccounts.erase(itr9);
     }
 
+*/
 }
 
 
