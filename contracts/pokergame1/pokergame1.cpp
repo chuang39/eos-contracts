@@ -209,6 +209,18 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
     eosio_assert(t.to == _self, "Transfer not made to this contract");
     eosio_assert(t.quantity.is_valid(), "Invalid token transfer");
     eosio_assert(t.quantity.amount > 0, "Quantity must be positive");
+
+    string usercomment = t.memo;
+    uint32_t gameid = 1;    // 1: jacks-or-better; 2: jacks-or-better 5x
+    if (usercomment.find("type[") == 0) {
+        uint32_t pos = usercomment.find("]");
+        if (pos > 0) {
+            string ucm = usercomment.substr(5, pos - 5);
+            gameid = stoi(ucm);
+        }
+    }
+    eosio_assert((gameid == 1 || gameid == 2), "Non-recognized game id");
+
     auto itr_metadata = metadatas.begin();
     eosio_assert(itr_metadata != metadatas.end(), "No game is found.");
     eosio_assert(itr_metadata->gameon == 1, "Game is paused.");
@@ -237,9 +249,6 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         });
     }
 
-    // check if the pool ends or not
-    // eosio_assert(itr_user1->bet == 0, "Previous round does not end.");
-
     // start a new round
     // deposit money and draw 5 cards
     checksum256 roothash = gethash(user, 0, itr_metadata->trounds);
@@ -258,6 +267,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
     std::set<uint32_t> myset;
     getcards(user, roothash, arr, 5, myset, amount);
     pools.modify(itr_user1, _self, [&](auto &p){
+        p.status = gameid;
         p.bet = amount;
         p.betcurrency = bettype;
         p.card1 = arr[0];
@@ -1165,6 +1175,15 @@ void pokergame1::setcards(const name from, uint32_t c1, uint32_t c2, uint32_t c3
     });
 }
  */
+
+
+
+
+
+
+
+
+
 
 #define EOSIO_ABI_EX( TYPE, MEMBERS ) \
 extern "C" { \
