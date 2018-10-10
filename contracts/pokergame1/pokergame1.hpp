@@ -44,7 +44,8 @@ public:
              cardstats(_self, _self),
              typestats(_self, _self),
              paccounts(_self, _self),
-             pool5xs(_self, _self){};
+             pool5xs(_self, _self),
+             suaccounts(_self, _self){};
 
     //@abi action
     void dealreceipt(const name from, string hash1, string hash2, string card1, string card2, string card3, string card4, string card5, string betineos, string winineos, uint64_t betnum, uint64_t winnum);
@@ -55,15 +56,18 @@ public:
     void drawcards(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5);
     //@abi action
     void drawcards5x(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5);
-
+/*
     //@abi action
     void clear();
     //@abi action
     void init();
+    */
     /*
     //@abi action
     void setcards(const name from, uint32_t c1, uint32_t c2, uint32_t c3, uint32_t c4, uint32_t c5);
      */
+    //@abi action
+    void myeosvegas(name vip, string message);
     //@abi action
     void setseed(const name from, uint32_t seed);
     //@abi action
@@ -164,6 +168,14 @@ private:
         EOSLIB_SERIALIZE(st_paccounts, (owner)(level)(exp)(lastbonus)(lastseen)(logins)(bonusnumber)(bonustype))
     };
 
+    // @abi table suaccounts i64
+    struct st_suaccounts {
+        name owner;
+
+        uint64_t primary_key() const { return owner; }
+
+        EOSLIB_SERIALIZE(st_suaccounts, (owner))
+    };
 
     // @abi table events i64
     struct st_events {
@@ -267,4 +279,7 @@ private:
     _tb_typestats typestats;
     typedef multi_index<N(paccounts), st_paccounts> _tb_paccounts;
     _tb_paccounts paccounts;
+
+    typedef multi_index<N(suaccounts), st_suaccounts> _tb_suaccounts;
+    _tb_suaccounts suaccounts;
 };

