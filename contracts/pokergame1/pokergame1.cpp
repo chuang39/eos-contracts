@@ -5,6 +5,25 @@
 
 // TODO; prevent malicious ram stealing
 
+//namespace eosiosystem {
+//    class system_contract;
+//}
+/*
+struct user_resources {
+    account_name  owner;
+    asset         net_weight;
+    asset         cpu_weight;
+    int64_t       ram_bytes = 0;
+
+    uint64_t primary_key()const { return owner; }
+
+    // explicit serialization macro is not necessary, used here only to improve compilation time
+    EOSLIB_SERIALIZE( user_resources, (owner)(net_weight)(cpu_weight)(ram_bytes) )
+};
+
+typedef eosio::multi_index< N(userres), user_resources>      user_resources_table;
+*/
+
 // (# of mev) = (# of eos) * miningtable[][1] / 100
 uint64_t miningtable[5][2] = {{400000000000, 400}, // 1EOS 4MEV
                               {400000000000 * 2, 200}, // 1EOS 2MEV
@@ -673,6 +692,9 @@ uint32_t pokergame1::checkwin(uint32_t c1, uint32_t c2, uint32_t c3, uint32_t c4
 void pokergame1::drawcards5x(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5) {
     require_auth(from);
 
+    auto itr_blacklist = blacklists.find(from);
+    eosio_assert(itr_blacklist == blacklists.end(), "Sorry, please be patient.");
+
     auto itr_pool = pools.find(from);
     eosio_assert(itr_pool != pools.end(), "User not found");
     eosio_assert(itr_pool->cardhash1.length() != 0, "Cards hasn't bee drawn.");
@@ -861,6 +883,10 @@ void pokergame1::drawcards5x(const name from, uint32_t externalsrc, string dump1
 
 void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5) {
     require_auth(from);
+
+
+    auto itr_blacklist = blacklists.find(from);
+    eosio_assert(itr_blacklist == blacklists.end(), "Sorry, please be patient.");
 
     auto itr_user = pools.find(from);
     eosio_assert(itr_user != pools.end(), "User not found");
@@ -1230,6 +1256,27 @@ void pokergame1::setgameon(uint64_t id, uint32_t flag) {
     }
 }
 
+void pokergame1::blacklist(const name to, uint32_t status) {
+    require_auth(_self);
+
+
+    if (status == 0) {
+        auto itr = blacklists.find(to);
+        if (itr != blacklists.end()) {
+            blacklists.erase(itr);
+        }
+    } else {
+        auto itr = blacklists.find(to);
+        if (itr == blacklists.end()) {
+            blacklists.emplace(_self, [&](auto &p) {
+                p.owner = to;
+            });
+        }
+    }
+
+
+}
+
 void pokergame1::setminingon(uint64_t id, uint32_t flag) {
     require_auth(_self);
     auto itr = metadatas.find(id);
@@ -1251,6 +1298,19 @@ void pokergame1::setseed(const name from, uint32_t seed) {
 void pokergame1::getbonus(const name from, const uint32_t type, uint32_t externalsrc) {
     require_auth(from);
 /*
+    eosio::token t(N(eosio.token));
+    const auto sym_name = eosio::symbol_type(S(4,EOS)).name();
+    const auto my_balance = t.get_balance(from, sym_name );
+    eosio::print("My balance is ", my_balance);
+
+
+    int64_t ram_bytes;
+    int64_t net_weight;
+    int64_t cpu_weight;
+    get_resource_limits(from, &ram_bytes, &net_weight, &cpu_weight );
+
+*/
+
     uint32_t curtime = now();
     auto itr_paccount = paccounts.find(from);
     if (itr_paccount == paccounts.end()) {
@@ -1301,21 +1361,20 @@ void pokergame1::getbonus(const name from, const uint32_t type, uint32_t externa
         bamount = 5000;
     }
 
-    if (btype == 1) {
+    if (false) {
         asset bal2 = asset(bamount, symbol_type(S(4, MEV)));
         action(permission_level{_self, N(active)}, N(eosvegascoin),
                N(transfer), std::make_tuple(N(eosvegasjack), from, bal2,
                                             std::string("Welcome! Daily bonus to enjoy the game @ MyEosVegas.com!")))
                 .send();
     } else {
-        asset bal = asset(bamount, symbol_type(S(4, EOS)));
+        asset bal = asset(1, symbol_type(S(4, EOS)));
             action(permission_level{_self, N(active)}, N(eosio.token),
                 N(transfer), std::make_tuple(_self, from, bal,
                                             std::string("Welcome! Daily bonus to enjoy the game @ MyEosVegas.com!")))
                 .send();
 
     }
-    */
 }
 
 /*
@@ -1347,6 +1406,8 @@ extern "C" { \
          /* onerror is only valid if it is for the "eosio" code account and authorized by "eosio"'s "active permission */ \
          eosio_assert(code == N(eosio), "onerror action's are only valid from the \"eosio\" system account"); \
       } \
+      print("=====", name{receiver}); \
+      print("=====", transaction_size()); \
       if(code == self || code == N(eosio.token) || code == N(eosvegascoin)) { \
           if (action == N(transfer) && code == self) { \
               return; \
@@ -1374,4 +1435,4 @@ extern "C" { \
 
 //EOSIO_ABI_EX(pokergame1, (dealreceipt)(drawcards)(clear)(setseed)(setcards)(init)(setgameon)(setminingon)(signup))
 //EOSIO_ABI_EX(pokergame1, (dealreceipt)(receipt5x)(drawcards)(drawcards5x)(clear)(setseed)(init)(setgameon)(setminingon)(signup)(getbonus))
-EOSIO_ABI_EX(pokergame1, (dealreceipt)(receipt5x)(drawcards)(drawcards5x)(setseed)(setgameon)(setminingon)(signup)(getbonus)(myeosvegas)(ramclean))
+EOSIO_ABI_EX(pokergame1, (dealreceipt)(receipt5x)(drawcards)(drawcards5x)(setseed)(setgameon)(setminingon)(signup)(getbonus)(myeosvegas)(ramclean)(blacklist))

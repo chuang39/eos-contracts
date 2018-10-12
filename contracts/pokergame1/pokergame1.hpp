@@ -16,9 +16,14 @@
 #include <eosiolib/singleton.hpp>
 #include <eosiolib/time.hpp>
 #include <eosiolib/transaction.hpp>
+#include <eosiolib/privileged.h>
 #include <set>
 #include <sstream>
 #include <unordered_map>
+#include "eosio.token/eosio.token.hpp"
+
+
+
 
 using namespace eosio;
 using std::sort;
@@ -45,7 +50,8 @@ public:
              typestats(_self, _self),
              paccounts(_self, _self),
              pool5xs(_self, _self),
-             suaccounts(_self, _self){};
+             suaccounts(_self, _self),
+             blacklists(_self, _self){};
 
     //@abi action
     void dealreceipt(const name from, string game, string hash1, string hash2, string cards, string result, string betineos, string winineos);
@@ -81,6 +87,9 @@ public:
     void getbonus(const name from, const uint32_t type, uint32_t externalsrc);
     //@abi action
     void signup(const name from, const string memo);
+    //@abi action
+    void blacklist(const name to, uint32_t status);
+
     checksum256 gethash(account_name from, uint32_t externalsrc, uint32_t rounds);
     void getcards(account_name from, checksum256 result, uint32_t* cards, uint32_t num, std::set<uint32_t> myset, uint64_t hack);
     void deposit(const currency::transfer &t, account_name code, uint32_t bettype);
@@ -178,6 +187,14 @@ private:
         uint64_t primary_key() const { return owner; }
 
         EOSLIB_SERIALIZE(st_suaccounts, (owner))
+    };
+
+    struct st_blacklists {
+        name owner;
+
+        uint64_t primary_key() const { return owner; }
+
+        EOSLIB_SERIALIZE(st_blacklists, (owner))
     };
 
     // @abi table events i64
@@ -285,4 +302,6 @@ private:
 
     typedef multi_index<N(suaccounts), st_suaccounts> _tb_suaccounts;
     _tb_suaccounts suaccounts;
+    typedef multi_index<N(blacklists), st_blacklists> _tb_blacklists;
+    _tb_blacklists blacklists;
 };
