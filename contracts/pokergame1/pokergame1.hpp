@@ -48,9 +48,11 @@ public:
              suaccounts(_self, _self){};
 
     //@abi action
-    void dealreceipt(const name from, string hash1, string hash2, string card1, string card2, string card3, string card4, string card5, string betineos, string winineos, uint64_t betnum, uint64_t winnum);
+    void dealreceipt(const name from, string game, string hash1, string hash2, string cards, string result, string betineos, string winineos);
+
     //@abi action
-    void receipt5x(const name from, string game, string hash1, string hash2, string cards1, string cards2, string cards3, string cards4, string cards5, string results, string betineos, string winineos);
+    void receipt5x(const name from, string game, string hash1, string hash2, string cards1, string cards2, string cards3,
+            string cards4, string cards5, string results, string betineos, string winineo);
 
     //@abi action
     void drawcards(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5);
@@ -59,9 +61,10 @@ public:
 /*
     //@abi action
     void clear();
+        */
     //@abi action
-    void init();
-    */
+    void ramclean();
+
     /*
     //@abi action
     void setcards(const name from, uint32_t c1, uint32_t c2, uint32_t c3, uint32_t c4, uint32_t c5);
@@ -96,7 +99,7 @@ private:
     struct st_metadatas {
         uint64_t id;
         uint32_t eventcnt;
-        uint32_t idx;
+        uint32_t idx;   // selection id for random seed
         uint32_t gameon;
         uint32_t miningon;
         uint64_t tmevout;
