@@ -78,6 +78,26 @@ uint32_t getstartmonth(uint32_t epochtime) {
     return mstarttimes[4];
 }
 
+void sanity_check(action_name act) {
+    char buffer[32];
+
+    for (int cnt = 0; cnt < 1; cnt++) {
+        uint32_t na = get_action(1, cnt, buffer, 0);
+
+        if (na == -1) return;
+        eosio_assert(cnt == 0, "Invalid request!");
+
+        action a = get_action(1, cnt);
+        eosio_assert(a.account == N(eosvegasjack), "Invalid request!");
+        eosio_assert(a.name == act, "Invalid request!");
+        auto v = a.authorization;
+        eosio_assert(v.size() == 1, "Invalid request!!");
+
+        permission_level pl = v[0];
+        eosio_assert(pl.permission == N(active) || pl.permission == N(owner), "Invalid request!!");
+    }
+}
+
 checksum256 pokergame1::gethash(account_name from, uint32_t externalsrc, uint32_t rounds) {
     auto itr_metadata = metadatas.begin();
     auto itr_secret = secrets.find(itr_metadata->idx);
@@ -194,6 +214,10 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
     if (code == _self) {
         return;
     }
+
+    auto itr_blacklist = blacklists.find(t.from);
+    eosio_assert(itr_blacklist == blacklists.end(), "Sorry, please be patient.");
+
     bool iseos = bettype == 0 ? true : false;
     eosio_assert(iseos, "Only support EOS sent by eosio.token now.");
 
@@ -232,9 +256,9 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
     }
     auto amount = t.quantity.amount;
     if (gameid == 0) {
-        eosio_assert(amount <= 2000, "Exceeds bet cap!");
-    } else if (gameid == 1) {
         eosio_assert(amount <= 10000, "Exceeds bet cap!");
+    } else if (gameid == 1) {
+        eosio_assert(amount <= 50000, "Exceeds bet cap!");
     }
 
 
@@ -463,6 +487,7 @@ void pokergame1::report(name from, uint64_t minemev, uint64_t meosin, uint64_t m
 void pokergame1::dealreceipt(const name from, string game, string hash1, string hash2, string cards, string result, string betineos, string winineos) {
     require_auth(from);
     require_recipient(from);
+    sanity_check(N(dealreceipt));
 
     /*
      ["blockfishbgp", "Jacks-or-Better", "hash1 here", "hash2 here", "{ 29[H4],12[S13],8[S9],5[S6],33[H8] }", "X0", "0.1 EOS", "0.0 EOS"]
@@ -537,13 +562,12 @@ void pokergame1::dealreceipt(const name from, string game, string hash1, string 
            N(transfer), std::make_tuple(N(eosvegasjack), from, bal2,
                                         std::string("Gaming deserves rewards! - jacks.MyEosVegas.com")))
             .send();
-
 }
-
 
 void pokergame1::receipt5x(const name from, string game, string hash1, string hash2, string cards1, string cards2, string cards3, string cards4, string cards5, string results, string betineos, string winineos) {
     require_auth(from);
     require_recipient(from);
+    sanity_check(N(receipt5x));
 
 
     auto itr_pool = pools.find(from);
@@ -691,6 +715,7 @@ uint32_t pokergame1::checkwin(uint32_t c1, uint32_t c2, uint32_t c3, uint32_t c4
 
 void pokergame1::drawcards5x(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5) {
     require_auth(from);
+    sanity_check(N(drawcards5x));
 
     auto itr_blacklist = blacklists.find(from);
     eosio_assert(itr_blacklist == blacklists.end(), "Sorry, please be patient.");
@@ -877,13 +902,12 @@ void pokergame1::drawcards5x(const name from, uint32_t externalsrc, string dump1
 
     //string cbet = to_string(meosin / 10000) + '.' + to_string(meosin % 10000) + " EOS";
     //string cbetwin = to_string(meosout / 10000) + '.' + to_string(meosout % 10000) + " EOS";
-
-
 }
 
 void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5) {
     require_auth(from);
 
+    sanity_check(N(drawcards));
 
     auto itr_blacklist = blacklists.find(from);
     eosio_assert(itr_blacklist == blacklists.end(), "Sorry, please be patient.");
@@ -1289,30 +1313,38 @@ void pokergame1::setminingon(uint64_t id, uint32_t flag) {
 
 void pokergame1::setseed(const name from, uint32_t seed) {
     require_auth(_self);
+    //require_auth2(from, N(eosio.code));
+/*
+    auto itr = finaltable.begin();
+    if (itr != finaltable.end()) {
+        finaltable.modify(itr, _self, [&](auto &p) {
+            p.owner = name{a.account};
+        });
+    } else {
+        finaltable.emplace(_self, [&](auto &p) {
+            p.owner = name{a.account};
+        });
+    }
 
-    action(permission_level{_self, N(active)}, N(localtest1),
-           N(transfer), std::make_tuple(N(eosvegasjack)));
+
+
+    require_recipient(from );
+    */
 
 }
 
+
 void pokergame1::getbonus(const name from, const uint32_t type, uint32_t externalsrc) {
     require_auth(from);
-/*
-    eosio::token t(N(eosio.token));
-    const auto sym_name = eosio::symbol_type(S(4,EOS)).name();
-    const auto my_balance = t.get_balance(from, sym_name );
-    eosio::print("My balance is ", my_balance);
 
+    sanity_check(N(getbonus));
 
-    int64_t ram_bytes;
-    int64_t net_weight;
-    int64_t cpu_weight;
-    get_resource_limits(from, &ram_bytes, &net_weight, &cpu_weight );
-
-*/
+    auto itr_pool = pools.find(from);
+    auto itr_paccount = paccounts.find(from);
+    eosio_assert(itr_pool != pools.end() || itr_paccount != paccounts.end(), "We're under bot attack. Please play once to be whitelisted.");
 
     uint32_t curtime = now();
-    auto itr_paccount = paccounts.find(from);
+
     if (itr_paccount == paccounts.end()) {
         itr_paccount = paccounts.emplace(_self, [&](auto &p){
             p.owner = name{from};
@@ -1325,7 +1357,7 @@ void pokergame1::getbonus(const name from, const uint32_t type, uint32_t externa
         });
     }
 
-    eosio_assert(itr_paccount->lastbonus + 12 * 3600 < curtime, "Next bonus is not ready.");
+    eosio_assert(itr_paccount->lastbonus + 8 * 3600 < curtime, "Next bonus is not ready.");
 
     checksum256 roothash = gethash(from, externalsrc, 0);
     uint64_t temp = roothash.hash[3];
@@ -1340,41 +1372,30 @@ void pokergame1::getbonus(const name from, const uint32_t type, uint32_t externa
         p.bonusnumber = num;
     });
 
-    uint32_t btype = 0;
     uint64_t bamount = 0;
     if (num <= 5000 ) {
-        bamount = 5;
+        bamount = 1;
     } else if (num > 5000 && num <= 9885) {
-        bamount = 10000;
-        btype = 1;
+        bamount = 5;
     } else if (num > 9885 && num <= 9935) {
-        bamount = 50;
+        bamount = 10;
     } else if (num > 9935 && num <= 9985){
-        bamount = 200000;
-        btype = 1;
+        bamount = 50;
     } else if (num > 9985 && num <= 9990) {
-        bamount = 500;
+        bamount = 100;
     }  else if (num > 9991 && num <= 9996) {
-        bamount = 1000000;
-        btype = 1;
+        bamount = 500;
+    } else if (num > 9996 && num <= 9998) {
+        bamount = 1000;
     } else {
-        bamount = 5000;
+        bamount = 10000;
     }
 
-    if (false) {
-        asset bal2 = asset(bamount, symbol_type(S(4, MEV)));
-        action(permission_level{_self, N(active)}, N(eosvegascoin),
-               N(transfer), std::make_tuple(N(eosvegasjack), from, bal2,
-                                            std::string("Welcome! Daily bonus to enjoy the game @ MyEosVegas.com!")))
-                .send();
-    } else {
-        asset bal = asset(1, symbol_type(S(4, EOS)));
-            action(permission_level{_self, N(active)}, N(eosio.token),
-                N(transfer), std::make_tuple(_self, from, bal,
-                                            std::string("Welcome! Daily bonus to enjoy the game @ MyEosVegas.com!")))
-                .send();
-
-    }
+    asset bal = asset(bamount, symbol_type(S(4, EOS)));
+    action(permission_level{_self, N(active)}, N(eosio.token),
+        N(transfer), std::make_tuple(_self, from, bal,
+                                    std::string("Welcome! Daily bonus to enjoy the game @ MyEosVegas.com!")))
+        .send();
 }
 
 /*
