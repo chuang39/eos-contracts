@@ -279,6 +279,34 @@ private:
         EOSLIB_SERIALIZE(st_typestats, (id)(count))
     };
 
+/*
+    // @abi table logbonus i64
+    struct st_logbonus {
+        uint64_t owner;
+        uint32_t lastbonus;
+        uint64_t primary_key() const { return owner; }
+        EOSLIB_SERIALIZE(st_logbonus, (owner)(lastbonus))
+    };
+
+
+
+    // @abi table bjpools i64
+    struct st_bjpools {
+        uint64_t owner;
+        uint32_t status;
+        uint64_t cards1;
+        uint64_t cards2;
+
+
+        uint64_t primary_key() const { return owner; }
+        EOSLIB_SERIALIZE(st_bjpools, (owner)(lastbonus))
+    };
+
+*/
+
+
+
+
     typedef multi_index<N(metadatas), st_metadatas> _tb_metadatas;
     _tb_metadatas metadatas;
     typedef multi_index<N(pools), st_pools> _tb_pools;
@@ -299,6 +327,9 @@ private:
     _tb_typestats typestats;
     typedef multi_index<N(paccounts), st_paccounts> _tb_paccounts;
     _tb_paccounts paccounts;
+
+    //typedef multi_index<N(paccounts), st_paccounts> _tb_paccounts;
+    //_tb_paccounts paccounts;
 
     typedef multi_index<N(suaccounts), st_suaccounts> _tb_suaccounts;
     _tb_suaccounts suaccounts;

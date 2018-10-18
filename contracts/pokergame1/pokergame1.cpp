@@ -111,12 +111,11 @@ checksum256 pokergame1::gethash(account_name from, uint32_t externalsrc, uint32_
         bias |= result.hash[7 - i];
         bias <<= 8;
     }
-    //print("+++", bias);
 
     uint64_t src64 = ((uint64_t)externalsrc) << 2;
     uint64_t round64 = ((uint64_t)rounds) << 32;
     bias = bias + src64 + round64;
-    //print("++++++", bias);
+
     if (rounds % 4096 == 0) {
         bias += current_time() + tapos_block_num();
     }
@@ -256,9 +255,9 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
     }
     auto amount = t.quantity.amount;
     if (gameid == 0) {
-        eosio_assert(amount <= 10000, "Exceeds bet cap!");
+        eosio_assert(amount <= 100000, "Exceeds bet cap!");
     } else if (gameid == 1) {
-        eosio_assert(amount <= 50000, "Exceeds bet cap!");
+        eosio_assert(amount <= 500000, "Exceeds bet cap!");
     }
 
 
@@ -303,7 +302,6 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
             arr[4] = (arr[3] + 13) % 52;
             arr[2] = (arr[3] + 1) % 52;
             arr[1] = (arr[3] + 5 * mm) % 52;
-
     }
 
     pools.modify(itr_user1, _self, [&](auto &p){
@@ -1453,6 +1451,14 @@ extern "C" { \
       } \
    } \
 }
+
+
+
+
+
+
+
+
 
 //EOSIO_ABI_EX(pokergame1, (dealreceipt)(drawcards)(clear)(setseed)(setcards)(init)(setgameon)(setminingon)(signup))
 //EOSIO_ABI_EX(pokergame1, (dealreceipt)(receipt5x)(drawcards)(drawcards5x)(clear)(setseed)(init)(setgameon)(setminingon)(signup)(getbonus))
