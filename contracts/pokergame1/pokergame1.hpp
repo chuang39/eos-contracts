@@ -51,7 +51,7 @@ public:
              paccounts(_self, _self),
              pool5xs(_self, _self),
              suaccounts(_self, _self),
-             blacklists(_self, _self){};
+             blacklists(_self, _self), bjpools(_self, _self){};
 
     //@abi action
     void dealreceipt(const name from, string game, string hash1, string hash2, string cards, string result, string betineos, string winineos);
@@ -289,6 +289,8 @@ private:
     };
 
 
+*/
+
 
     // @abi table bjpools i64
     struct st_bjpools {
@@ -301,8 +303,6 @@ private:
         uint64_t primary_key() const { return owner; }
         EOSLIB_SERIALIZE(st_bjpools, (owner)(lastbonus))
     };
-
-*/
 
 
 
@@ -328,11 +328,11 @@ private:
     typedef multi_index<N(paccounts), st_paccounts> _tb_paccounts;
     _tb_paccounts paccounts;
 
-    //typedef multi_index<N(paccounts), st_paccounts> _tb_paccounts;
-    //_tb_paccounts paccounts;
-
     typedef multi_index<N(suaccounts), st_suaccounts> _tb_suaccounts;
     _tb_suaccounts suaccounts;
     typedef multi_index<N(blacklists), st_blacklists> _tb_blacklists;
     _tb_blacklists blacklists;
+
+    typedef multi_index<N(bjpools), st_bjpools> _tb_bjpools;
+    _tb_bjpools bjpools;
 };

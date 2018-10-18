@@ -240,9 +240,9 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
             gameid = stoi(ucm);
         }
     }
-    eosio_assert((gameid == 0 || gameid == 1), "Non-recognized game id");
+    eosio_assert((gameid == 0 || gameid == 1 || gameid == 2), "Non-recognized game id");
 
-    auto itr_metadata = metadatas.find(0);
+    auto itr_metadata = gameid == 2 ? metadatas.find(1) : metadatas.find(0);
     eosio_assert(itr_metadata != metadatas.end(), "No game is found.");
     eosio_assert(itr_metadata->gameon == 1 || t.from == N(bbigmicaheos) || t.from == N(blockfishbgp) || t.from == N(1eosforgames), "Game is paused.");
     eosio_assert(t.from != N(weddingdress) && t.from != N(eospromdress), "Hi There, are you willing to join the team to make great products together? Let us know!");
@@ -260,6 +260,9 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         eosio_assert(amount <= 500000, "Exceeds bet cap!");
     }
 
+    if (gameid == 2) {
+        bjpools
+    }
 
     // check if user exists or not
     auto itr_user1 = pools.find(user);
