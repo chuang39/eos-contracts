@@ -51,7 +51,8 @@ public:
              paccounts(_self, _self),
              pool5xs(_self, _self),
              suaccounts(_self, _self),
-             blacklists(_self, _self), bjpools(_self, _self){};
+             blacklists(_self, _self),
+             bjpools(_self, _self){};
 
     //@abi action
     void dealreceipt(const name from, string game, string hash1, string hash2, string cards, string result, string betineos, string winineos);
@@ -64,10 +65,9 @@ public:
     void drawcards(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5);
     //@abi action
     void drawcards5x(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5);
-/*
+
     //@abi action
     void clear();
-        */
     //@abi action
     void ramclean();
 
@@ -89,9 +89,18 @@ public:
     void signup(const name from, const string memo);
     //@abi action
     void blacklist(const name to, uint32_t status);
+    //@abi action
+    void init();
+
+    //@abi action
+    void bjstand(const name from, string hash, string cards);
+    //@abi action
+    void bjhit(const name to);
+    //@abi denyinsurance
+    void denyinsurance(const account_name from, uint32_t externalsrc);
 
     checksum256 gethash(account_name from, uint32_t externalsrc, uint32_t rounds);
-    void getcards(account_name from, checksum256 result, uint32_t* cards, uint32_t num, std::set<uint32_t> myset, uint64_t hack);
+    void getcards(account_name from, checksum256 result, uint32_t* cards, uint32_t num, std::set<uint32_t> myset, uint64_t hack, uint32_t maxcard);
     void deposit(const currency::transfer &t, account_name code, uint32_t bettype);
     bool checkflush(uint32_t colors[5]);
     bool checkstraight(uint32_t numbers[5]);
@@ -101,6 +110,12 @@ public:
     uint32_t parsecard(string s);
     void report(name from, uint64_t minemev, uint64_t meosin, uint64_t meosout);
     uint32_t checkwin(uint32_t c1, uint32_t c2, uint32_t c3, uint32_t c4, uint32_t c5);
+
+
+    void depositg1(const currency::transfer &t, uint32_t gameid, uint32_t trounds, uint32_t bettype);
+    void depositg2(const currency::transfer &t, uint32_t trounds);
+    void bj_get_cards(uint64_t cards, uint32_t count, uint32_t* arr);
+    uint32_t bj_get_stat(uint32_t status);
 
 private:
     // 0: jacks or better
@@ -161,6 +176,29 @@ private:
         uint64_t primary_key() const { return owner; }
 
         EOSLIB_SERIALIZE(st_pool5xs, (owner)(cards1)(cards2)(cards3)(cards4)(cards5)(wintype)(betwin1)(betwin2)(betwin3)(betwin4)(betwin5))
+    };
+
+
+    // @abi table bjpools i64
+    struct st_bjpools {
+        name owner;
+        uint32_t status;
+        uint64_t dcards;
+        uint32_t dcnt;
+        uint64_t pcards1;
+        uint32_t pcnt1;
+        uint64_t pcards2;
+        uint32_t pcnt2;
+        uint32_t wintype;
+        uint32_t betcurrency;
+        uint64_t bet;
+        uint64_t betwin;
+        uint64_t userseed;
+        string cardhash;
+
+        uint64_t primary_key() const { return owner; }
+
+        EOSLIB_SERIALIZE(st_bjpools, (owner)(status)(dcards)(dcnt)(pcards1)(pcnt1)(pcards2)(pcnt2)(wintype)(betcurrency)(bet)(betwin)(userseed)(cardhash))
     };
 
 
@@ -290,19 +328,6 @@ private:
 
 
 */
-
-
-    // @abi table bjpools i64
-    struct st_bjpools {
-        uint64_t owner;
-        uint32_t status;
-        uint64_t cards1;
-        uint64_t cards2;
-
-
-        uint64_t primary_key() const { return owner; }
-        EOSLIB_SERIALIZE(st_bjpools, (owner)(lastbonus))
-    };
 
 
 
