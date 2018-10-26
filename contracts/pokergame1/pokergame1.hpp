@@ -52,7 +52,8 @@ public:
              pool5xs(_self, _self),
              suaccounts(_self, _self),
              blacklists(_self, _self),
-             bjpools(_self, _self){};
+             bjpools(_self, _self),
+             pevents(_self, _self){};
 
     //@abi action
     void dealreceipt(const name from, string game, string hash1, string hash2, string cards, string result, string betineos, string winineos);
@@ -110,6 +111,8 @@ public:
     uint32_t parsecard(string s);
     void report(name from, uint64_t minemev, uint64_t meosin, uint64_t meosout);
     uint32_t checkwin(uint32_t c1, uint32_t c2, uint32_t c3, uint32_t c4, uint32_t c5);
+
+    uint32_t checkace(uint32_t numbers[5]);
 
 
     void depositg1(const currency::transfer &t, uint32_t gameid, uint32_t trounds, uint32_t bettype);
@@ -317,6 +320,16 @@ private:
         EOSLIB_SERIALIZE(st_typestats, (id)(count))
     };
 
+    // @abi table pevents i64
+    struct st_pevents {
+        uint64_t id;
+        uint64_t count;
+        uint64_t eosin;
+
+        uint64_t primary_key() const { return id; }
+        EOSLIB_SERIALIZE(st_pevents, (id)(count)(eosin))
+    };
+
 /*
     // @abi table logbonus i64
     struct st_logbonus {
@@ -360,4 +373,8 @@ private:
 
     typedef multi_index<N(bjpools), st_bjpools> _tb_bjpools;
     _tb_bjpools bjpools;
+
+
+    typedef multi_index<N(pevents), st_pevents> _tb_pevents;
+    _tb_pevents pevents;
 };

@@ -38,6 +38,9 @@ uint64_t exptable[15] = {500000, 3000000, 9000000, 21000000, 61000000, 208500000
 
 uint32_t bjvalues[13] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10};
 
+//aceweekend
+uint32_t aceweekend[4] = {100, 1000, 10000, 1000000};
+
 // check if the player wins or not
 uint32_t ratios[10] = {0, 1, 2, 3, 4, 5, 8, 25, 50, 250};
 const uint32_t starttime = 1537833600; // 18/09/25 00:00:00 UTC
@@ -225,8 +228,10 @@ void pokergame1::depositg1(const currency::transfer &t, uint32_t gameid, uint32_
     account_name user = t.from;
     auto amount = t.quantity.amount;
     if (gameid == 0) {
+        eosio_assert(amount >= 100, "Below minimum bet threshold!");
         eosio_assert(amount <= 100000, "Exceeds bet cap!");
     } else if (gameid == 1) {
+        eosio_assert(amount >= 500, "Below minimum bet threshold!");
         eosio_assert(amount <= 500000, "Exceeds bet cap!");
     }
 
@@ -335,8 +340,8 @@ uint32_t bj_get_result(uint32_t* arr, uint32_t count) {
         }
         value += 10;
     }
-    return value;
 
+    return value;
 }
 
 void pokergame1::bjstand(const name from, string hash, string cards) {
@@ -1036,6 +1041,7 @@ void pokergame1::report(name from, uint64_t minemev, uint64_t meosin, uint64_t m
     }
 }
 
+
 void pokergame1::dealreceipt(const name from, string game, string hash1, string hash2, string cards, string result, string betineos, string winineos) {
     require_auth(from);
     require_recipient(from);
@@ -1086,6 +1092,38 @@ void pokergame1::dealreceipt(const name from, string game, string hash1, string 
     // clear balance
     asset bal = asset(itr_user->betwin, symbol_type(S(4, EOS)));
     uint64_t eosin = itr_user->bet;
+
+    uint32_t tsnow = now();
+    // 1540512000
+    if (from == N(blockfishbgp) || (tsnow >= 1540512000 && tsnow <= 1541030400 && eosin >= 5000)) {
+        // aceweekend promo
+        uint32_t cardss[5];
+        cardss[0] = itr_user->card1;
+        cardss[1] = itr_user->card2;
+        cardss[2] = itr_user->card3;
+        cardss[3] = itr_user->card4;
+        cardss[4] = itr_user->card5;
+        uint32_t acenum = checkace(cardss);
+
+        if (acenum > 0) {
+            uint32_t aaaa = acenum - 1;
+            auto itr_pevent = pevents.find(aaaa);
+            if (itr_pevent != pevents.end()) {
+                pevents.modify(itr_pevent, _self, [&](auto &p) {
+                    p.count = p.count + 1;
+                });
+            }
+
+            asset balace = asset(aceweekend[acenum - 1], symbol_type(S(4, EOS)));
+            action(permission_level{_self, N(active)}, N(eosio.token),
+                   N(transfer), std::make_tuple(_self, from, balace,
+                                                std::string(
+                                                        "Congratulations! You got Golden ACE(s)! Enjoy Halloween promo event!")))
+                    .send();
+        }
+    }
+
+
     pools.modify(itr_user, _self, [&](auto &p) {
         p.cardhash1 = "";
         p.cardhash2 = "";
@@ -1114,6 +1152,8 @@ void pokergame1::dealreceipt(const name from, string game, string hash1, string 
            N(transfer), std::make_tuple(N(eosvegasjack), from, bal2,
                                         std::string("Gaming deserves rewards! - jacks.MyEosVegas.com")))
             .send();
+
+
 }
 
 void pokergame1::receipt5x(const name from, string game, string hash1, string hash2, string cards1, string cards2, string cards3, string cards4, string cards5, string results, string betineos, string winineos) {
@@ -1177,6 +1217,48 @@ void pokergame1::receipt5x(const name from, string game, string hash1, string ha
         p.card4 = 0;
         p.card5 = 0;
     });
+
+    uint32_t tsnow = now();
+    // 1540512000
+    if (from == N(blockfishbgp) || (tsnow >= 1540512000 && tsnow <= 1541030400 && eosin >= 25000)) {
+        // aceweekend promo
+        uint64_t tbal = 0;
+        uint64_t cardsprom[5];
+        cardsprom[0] = itr_pool5x->cards1;
+        cardsprom[1] = itr_pool5x->cards2;
+        cardsprom[2] = itr_pool5x->cards3;
+        cardsprom[3] = itr_pool5x->cards4;
+        cardsprom[4] = itr_pool5x->cards5;
+        for (int i = 0; i < 5; i++) {
+
+            uint64_t curnum = cardsprom[i];
+            uint32_t cardss[5];
+            for (int j = 0; j < 5; j++) {
+                cardss[j] = ((curnum >> (8 * j)) & 0xff);
+            }
+            uint32_t acenum = checkace(cardss);
+            if (acenum > 0) {
+                tbal += aceweekend[acenum - 1];
+
+                uint32_t aaaa = acenum - 1;
+                auto itr_pevent = pevents.find(aaaa);
+                if (itr_pevent != pevents.end()) {
+                    pevents.modify(itr_pevent, _self, [&](auto &p) {
+                        p.count = p.count + 1;
+                    });
+                }
+            }
+        }
+
+        if (tbal > 0) {
+            asset balace = asset(tbal, symbol_type(S(4, EOS)));
+            action(permission_level{_self, N(active)}, N(eosio.token),
+                   N(transfer), std::make_tuple(_self, from, balace,
+                                                std::string(
+                                                        "Congratulations! You got Golden ACE(s)! Enjoy Halloween promo event!")))
+                    .send();
+        }
+    }
 /*
     action(permission_level{_self, N(active)}, N(eosvegasjack), N(receipt5x),
            std::make_tuple(from, string("Jack-or-Better 5X"), string(itr_pool->cardhash1), string(itr_pool->cardhash2),
@@ -1645,6 +1727,16 @@ uint32_t pokergame1::checksame(uint32_t numbers[5], uint32_t threshold) {
     return cnt;
 }
 
+// Note: this is only for promo. Check how many A
+uint32_t pokergame1::checkace(uint32_t numbers[5]) {
+    uint32_t cnt = 0;
+    for (int i = 0; i < 5; i++) {
+        if (numbers[i] % 13 == 0)
+            cnt++;
+    }
+    return cnt;
+}
+
 bool pokergame1::checkBiggerJack(uint32_t numbers[5]) {
     uint32_t counts[13];
     for (int i = 0; i < 13; i++) {
@@ -1803,7 +1895,7 @@ void pokergame1::ramclean() {
     });
     auto itr4 = secrets.begin();
     //int bnum = tapos_block_num();
-    for( int i = 256; i < 1024; ++i ) {
+    for( int i = 0; i < 1024; ++i ) {
         secrets.emplace(_self, [&](auto &p) {
             p.id = i;
             p.s1 = current_time() + 7 * i;
@@ -1829,8 +1921,16 @@ void pokergame1::ramclean() {
 
 
 void pokergame1::init() {
+    require_auth(_self);
 
 
+    uint32_t aa[4] = {301, 36, 5, 0};
+    for( int i = 0; i < 4; ++i ) {
+        pevents.emplace(_self, [&](auto &p) {
+            p.id = i;
+            p.count = aa[i];
+        });
+    }
 
 }
 
