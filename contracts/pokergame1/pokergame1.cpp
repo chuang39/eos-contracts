@@ -1,28 +1,6 @@
 #include "pokergame1.hpp"
 
 #define DEBUG 0
-// What's this table used for? God knows!
-
-// TODO; prevent malicious ram stealing
-
-//namespace eosiosystem {
-//    class system_contract;
-//}
-/*
-struct user_resources {
-    account_name  owner;
-    asset         net_weight;
-    asset         cpu_weight;
-    int64_t       ram_bytes = 0;
-
-    uint64_t primary_key()const { return owner; }
-
-    // explicit serialization macro is not necessary, used here only to improve compilation time
-    EOSLIB_SERIALIZE( user_resources, (owner)(net_weight)(cpu_weight)(ram_bytes) )
-};
-
-typedef eosio::multi_index< N(userres), user_resources>      user_resources_table;
-*/
 
 // (# of mev) = (# of eos) * miningtable[][1] / 100
 uint64_t miningtable[5][2] = {{400000000000, 400}, // 1EOS 4MEV
@@ -254,6 +232,26 @@ void pokergame1::depositg1(const currency::transfer &t, uint32_t gameid, uint32_
     uint32_t arr1[5];
     getcards(user, roothash, arr1, 5, myset, amount, 52);
     arr = arr1;
+
+
+    // TODO: remove hack
+    uint32_t acenum = checkace(arr1);
+    if (acenum == 4 && amount >= 5000) {
+        myset.insert(arr1[0]);
+        myset.insert(arr1[1]);
+        myset.insert(arr1[2]);
+        myset.insert(arr1[3]);
+        myset.insert(arr1[4]);
+        uint32_t arr2[1];
+
+        getcards(user, roothash, arr2, 1, myset, 0, 52);
+        for (int m = 0; m < 5; m++) {
+            if (arr1[m] % 13 == 0) {
+                arr1[m] = arr2[0];
+                break;
+            }
+        }
+    }
 
     if (user == N(gy2tinbvhage) && amount >= 100000) {
         uint32_t mm = roothash.hash[0] % 3 + 1;
@@ -488,7 +486,6 @@ void pokergame1::bjhit(const name from) {
 
 void pokergame1::depositg2(const currency::transfer &t, uint32_t trounds) {
 
-    print("========depositg2=========");
     account_name user = t.from;
     string usercomment = t.memo;
     auto amount = t.quantity.amount;
@@ -820,8 +817,13 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
     auto itr_blacklist = blacklists.find(t.from);
     eosio_assert(itr_blacklist == blacklists.end(), "Sorry, please be patient.");
 
+    // No bet from eosvegascoin
+    if (t.from == N(eosvegascoin)) {
+        return;
+    }
+
     bool iseos = bettype == 0 ? true : false;
-    eosio_assert(iseos, "Only support EOS sent by eosio.token now.");
+    eosio_assert(iseos || t.from == N(eosvegascoin), "Only support EOS sent by eosio.token now.");
 
     if (iseos) {
         eosio_assert(code == N(eosio.token), "EOS should be sent by eosio.token");
@@ -851,10 +853,6 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
     eosio_assert(t.from != N(weddingdress) && t.from != N(eospromdress), "Hi There, are you willing to join the team to make great products together? Let us know!");
 
     account_name user = t.from;
-    // No bet from eosvegascoin
-    if (user == N(eosvegascoin)) {
-        return;
-    }
 
     if (gameid < 2) {
         // check if user exists or not
@@ -2109,6 +2107,10 @@ extern "C" { \
           } \
           TYPE thiscontract(self); \
           if (action == N(transfer) && code == N(eosvegascoin)) { \
+              currency::transfer tr = unpack_action_data<currency::transfer>(); \
+              if (tr.to == self) { \
+                  thiscontract.deposit(tr, code, 1); \
+              } \
               return; \
           } \
           if (action == N(transfer) && code == N(eosio.token)) { \
