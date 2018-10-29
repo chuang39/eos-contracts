@@ -94,11 +94,17 @@ public:
     void init();
 
     //@abi action
-    void bjstand(const name from, string hash, string cards);
+    void bjstand(const name from, string hash, std::vector<uint32_t> dealer_hand, std::vector<uint32_t> player_hand1,
+            std::vector<uint32_t> player_hand2);
     //@abi action
-    void bjhit(const name to);
-    //@abi denyinsurance
-    void denyinsurance(const account_name from, uint32_t externalsrc);
+    void bjhit(const name from, string hash, std::vector<uint32_t> dealer_hand,
+               std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2);
+    //@abi action
+    void bjuninsure(const account_name from, uint32_t externalsrc);
+    //@abi action
+    void bjreceipt(string game_id, const name from, string game, string hash, std::vector<uint32_t> dealer_hand,
+                   std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2, string bet, string win);
+
 
     checksum256 gethash(account_name from, uint32_t externalsrc, uint32_t rounds);
     void getcards(account_name from, checksum256 result, uint32_t* cards, uint32_t num, std::set<uint32_t> myset, uint64_t hack, uint32_t maxcard);
@@ -116,7 +122,7 @@ public:
 
 
     void depositg1(const currency::transfer &t, uint32_t gameid, uint32_t trounds, uint32_t bettype);
-    void depositg2(const currency::transfer &t, uint32_t trounds);
+    void depositg2(const currency::transfer &t, uint32_t gameid, uint32_t trounds);
     void bj_get_cards(uint64_t cards, uint32_t count, uint32_t* arr);
     uint32_t bj_get_stat(uint32_t status);
 
@@ -196,12 +202,14 @@ private:
         uint32_t betcurrency;
         uint64_t bet;
         uint64_t betwin;
+        uint64_t insurance;
+        uint64_t insurancewin;
         uint64_t userseed;
         string cardhash;
 
         uint64_t primary_key() const { return owner; }
 
-        EOSLIB_SERIALIZE(st_bjpools, (owner)(status)(dcards)(dcnt)(pcards1)(pcnt1)(pcards2)(pcnt2)(wintype)(betcurrency)(bet)(betwin)(userseed)(cardhash))
+        EOSLIB_SERIALIZE(st_bjpools, (owner)(status)(dcards)(dcnt)(pcards1)(pcnt1)(pcards2)(pcnt2)(wintype)(betcurrency)(bet)(betwin)(insurance)(insurancewin)(userseed)(cardhash))
     };
 
 

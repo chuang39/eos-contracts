@@ -24,6 +24,7 @@ uint32_t ratios[10] = {0, 1, 2, 3, 4, 5, 8, 25, 50, 250};
 const uint32_t starttime = 1537833600; // 18/09/25 00:00:00 UTC
 const uint32_t wstarttime = 1537747200; //GMT: Monday, September 24, 2018 12:00:00 AM
 uint64_t mstarttimes[5] = {1535760000, 1538352000, 1541030400, 1543622400, 1546300800};
+const char hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
 
 uint32_t getlevel(uint64_t teosin) {
     uint64_t totalexp = teosin * 50;
@@ -61,7 +62,7 @@ uint32_t getstartmonth(uint32_t epochtime) {
     return mstarttimes[4];
 }
 
-void sanity_check(action_name act) {
+void sanity_check(uint64_t code, action_name act) {
     char buffer[32];
 
     for (int cnt = 0; cnt < 1; cnt++) {
@@ -71,7 +72,7 @@ void sanity_check(action_name act) {
         eosio_assert(cnt == 0, "Invalid request!");
 
         action a = get_action(1, cnt);
-        eosio_assert(a.account == N(eosvegasjack), "Invalid request!");
+        eosio_assert(a.account == code, "Invalid request!");
         eosio_assert(a.name == act, "Invalid request!");
         auto v = a.authorization;
         eosio_assert(v.size() == 1, "Invalid request!!");
@@ -217,7 +218,7 @@ void pokergame1::depositg1(const currency::transfer &t, uint32_t gameid, uint32_
     // deposit money and draw 5 cards
     checksum256 roothash = gethash(user, 0, trounds);
     string rhash;
-    char const hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+
     for( int i = 0; i < 32; ++i )
     {
         char const byte = roothash.hash[i];
@@ -234,7 +235,7 @@ void pokergame1::depositg1(const currency::transfer &t, uint32_t gameid, uint32_
     arr = arr1;
 
 
-    // TODO: remove hack
+    // TODO: aceweekend remove hack
     uint32_t acenum = checkace(arr1);
     if (acenum == 4 && amount >= 5000) {
         myset.insert(arr1[0]);
@@ -320,13 +321,8 @@ uint32_t bj_get_result(uint32_t* arr, uint32_t count) {
 
     for (int i = 0; i < count; i++) {
         uint32_t num = arr[i] % 13;
-
-        if (num == 0) {
-            value = value + 1;
-            aces++;
-        } else {
-            value += bjvalues[num];
-        }
+        if (num == 0) aces++;
+        value += bjvalues[num];
     }
 
     // bust
@@ -342,10 +338,32 @@ uint32_t bj_get_result(uint32_t* arr, uint32_t count) {
     return value;
 }
 
-void pokergame1::bjstand(const name from, string hash, string cards) {
+void pokergame1::bjstand(const name from, string hash, std::vector<uint32_t> dealer_hand,
+        std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2) {
     require_auth(from);
+    sanity_check(N(eosvegasjack), N(bjstand));
 
     auto itr_bjpool = bjpools.find(from);
+    eosio_assert(itr_bjpool != bjpools.end(), "Blackjack: cannot find user pool");
+
+    // input check
+    uint64_t dcards_in = 0;
+    uint64_t pcards1_in = 0;
+    uint64_t pcards2_in = 0;
+    for(std::vector<uint32_t>::size_type i = 0; i != dealer_hand.size(); i++) {
+        dcards_in |= (((uint64_t)dealer_hand[i]) << (i * 8));
+    }
+    for(std::vector<uint32_t>::size_type i = 0; i != player_hand1.size(); i++) {
+        pcards1_in |= (((uint64_t)player_hand1[i]) << (i * 8));
+    }
+    if (player_hand2.size() > 0) {
+        for(std::vector<uint32_t>::size_type i = 0; i != player_hand2.size(); i++) {
+            pcards2_in |= (((uint64_t)player_hand2[i]) << (i * 8));
+        }
+    }
+    eosio_assert(dcards_in == itr_bjpool->dcards, "Blackjack: dealer cards mismatch");
+    eosio_assert(pcards1_in == itr_bjpool->pcards1, "Blackjack: 1st hand mismatches");
+    eosio_assert(pcards2_in == itr_bjpool->pcards2, "Blackjack: 2nd hand mismatches");
 
     uint32_t bjstat = bj_get_stat(itr_bjpool->status);
     eosio_assert(bjstat == 3 || bjstat == 4 || bjstat > 11, "Blackjack: wrong status for action stand.");
@@ -354,17 +372,15 @@ void pokergame1::bjstand(const name from, string hash, string cards) {
 
     checksum256 roothash = gethash(from, 0, 0);
     string rhash;
-    char const hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+
     for( int i = 0; i < 32; ++i )
     {
         char const byte = roothash.hash[i];
         rhash += hex_chars[ ( byte & 0xF0 ) >> 4 ];
         rhash += hex_chars[ ( byte & 0x0F ) >> 0 ];
     }
-    print("====1====", itr_bjpool->status);
-    print("====2====", bjstat);
+
     if (bjstat == 3 || bjstat == 4) {
-        print("========", bjstat);
         uint32_t parr[itr_bjpool->pcnt1];
         // get player cards, not number here!
         bj_get_cards(itr_bjpool->pcards1, itr_bjpool->pcnt1, parr);
@@ -391,16 +407,19 @@ void pokergame1::bjstand(const name from, string hash, string cards) {
         int dindex = 1;
         uint32_t dresult = 0;
         uint64_t dcards = darr[0];
+        print("=====card:",darr[0]);
         for (int i = 0; i < 20; i++) {
             // 1st card A, 2nd card cannot be 10,J,Q,K
-            if (d0num == 0 && (darrtemp[i] % 13) >= 9) continue;
+            if (d0num == 0 && dindex == 1 && (darrtemp[i] % 13) >= 9) continue;
             // 1st car 10,J,Q,K, 2nd card cannot be A;
-            if (d0num >=9 && (darrtemp[i] % 13) == 0) continue;
+            if (d0num >=9 && dindex == 1 && (darrtemp[i] % 13) == 0) continue;
 
             dcards |= (((uint64_t)darrtemp[i]) << (8 * dindex));
 
             darr[dindex++] = darrtemp[i];
-            dresult = bj_get_result(darr, 1 + dindex);
+            dresult = bj_get_result(darr, dindex);  // here dindex is already the right size of new hand.
+
+            print("=====card:",darrtemp[i],"===result:", dresult);
             if (dresult >= 17) {
                 break;
             }
@@ -422,17 +441,39 @@ void pokergame1::bjstand(const name from, string hash, string cards) {
             p.status = 1;
             p.dcards = dcards;
             p.dcnt = dindex;
-            p.cardhash = p.cardhash + ":" +rhash;
+            p.cardhash = p.cardhash + ":[stand]" +rhash;
             p.betwin = betwin;
         });
     }
+
 }
 
-
-void pokergame1::bjhit(const name from) {
+void pokergame1::bjhit(const name from, string hash, std::vector<uint32_t> dealer_hand,
+                       std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2) {
     require_auth(from);
+    sanity_check(N(eosvegasjack), N(bjhit));
 
     auto itr_bjpool = bjpools.find(from);
+    eosio_assert(itr_bjpool != bjpools.end(), "Blackjack: cannot find user pool");
+
+    // input check
+    uint64_t dcards_in = 0;
+    uint64_t pcards1_in = 0;
+    uint64_t pcards2_in = 0;
+    for(std::vector<uint32_t>::size_type i = 0; i != dealer_hand.size(); i++) {
+        dcards_in |= (((uint64_t)dealer_hand[i]) << (i * 8));
+    }
+    for(std::vector<uint32_t>::size_type i = 0; i != player_hand1.size(); i++) {
+        pcards1_in |= (((uint64_t)player_hand1[i]) << (i * 8));
+    }
+    if (player_hand2.size() > 0) {
+        for(std::vector<uint32_t>::size_type i = 0; i != player_hand2.size(); i++) {
+            pcards2_in |= (((uint64_t)player_hand2[i]) << (i * 8));
+        }
+    }
+    eosio_assert(dcards_in == itr_bjpool->dcards, "Blackjack: dealer cards mismatch");
+    eosio_assert(pcards1_in == itr_bjpool->pcards1, "Blackjack: 1st hand mismatches");
+    eosio_assert(pcards2_in == itr_bjpool->pcards2, "Blackjack: 2nd hand mismatches");
 
     uint32_t bjstat = bj_get_stat(itr_bjpool->status);
     eosio_assert(bjstat == 3 || bjstat == 4 || bjstat > 11, "Blackjack: wrong status for action hit.");
@@ -441,14 +482,13 @@ void pokergame1::bjhit(const name from) {
 
     checksum256 roothash = gethash(from, 0, 0);
     string rhash;
-    char const hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+
     for( int i = 0; i < 32; ++i )
     {
         char const byte = roothash.hash[i];
         rhash += hex_chars[ ( byte & 0xF0 ) >> 4 ];
         rhash += hex_chars[ ( byte & 0x0F ) >> 0 ];
     }
-
 
     if (bjstat == 3 || bjstat == 4) {
         uint32_t parr[itr_bjpool->pcnt1];
@@ -457,12 +497,16 @@ void pokergame1::bjhit(const name from) {
         uint32_t parrnew[itr_bjpool->pcnt1 + 1];
         for (int i = 0; i < itr_bjpool->pcnt1; i++) {
             myset.insert(parr[i]);
-            parrnew[i + 1] = parr[i];
+            parrnew[i] = parr[i];
         }
 
-        getcards(from, roothash, parrnew, 1, myset, 0, 208);
+        uint32_t singlenew[1];
+        getcards(from, roothash, singlenew, 1, myset, 0, 208);
+        parrnew[itr_bjpool->pcnt1] = singlenew[0];
 
-        uint32_t presult = bj_get_result(parrnew,itr_bjpool->pcnt1 + 1);
+        // check if bust
+        uint32_t presult = bj_get_result(parrnew, itr_bjpool->pcnt1 + 1);
+        print("=======player result:", presult);
         uint32_t bjstat = 4;
 
         uint64_t betwin = 0;
@@ -471,24 +515,74 @@ void pokergame1::bjhit(const name from) {
         } else if (itr_bjpool->pcnt1 == 7) {
             bjstat = 1;
             betwin = itr_bjpool->bet * 2;
+        } else if (presult == 21) {
+            myset.clear();
+            // dealer draws cards. Add previous cards to myset.
+            for (int i = 0; i < (itr_bjpool->pcnt1 + 1); i++) {
+                myset.insert(parrnew[i]);
+            }
+            uint32_t darr[8];
+            darr[0] = itr_bjpool->dcards & 0xff;
+            myset.insert(darr[0]);
+
+            // get new cards for dealer
+            // we use 16 here, since if first card is 10, it cannot be A; first card is A, it cannot be 10;
+            uint32_t darrtemp[20];
+            getcards(from, roothash, darrtemp, 20, myset, 0, 208);
+
+            uint32_t d0num = darr[0] % 13;
+            int dindex = 1;
+            uint32_t dresult = 0;
+            uint64_t dcards = darr[0];
+            for (int i = 0; i < 20; i++) {
+                // 1st card A, 2nd card cannot be 10,J,Q,K
+                if (d0num == 0 && dindex == 1 && (darrtemp[i] % 13) >= 9) continue;
+                // 1st car 10,J,Q,K, 2nd card cannot be A;
+                if (d0num >=9 && dindex == 1 && (darrtemp[i] % 13) == 0) continue;
+
+                dcards |= (((uint64_t)darrtemp[i]) << (8 * dindex));
+
+                darr[dindex++] = darrtemp[i];
+                dresult = bj_get_result(darr, dindex);
+                if (dresult >= 17) {
+                    break;
+                }
+
+                if (dindex == 8) break;
+            }
+
+            if (dresult != 21) {
+                betwin = itr_bjpool->bet * 2;
+            }
+            bjstat = 1;
         }
 
         bjpools.modify(itr_bjpool, _self, [&](auto &p) {
             p.status = bjstat;
-            p.pcards1 = p.pcards1 | (((uint64_t)parrnew[0]) << (8 * p.pcnt1));
+            p.pcards1 = p.pcards1 | (((uint64_t)singlenew[0]) << (8 * p.pcnt1));
             p.pcnt1 = p.pcnt1 + 1;
-            p.cardhash = p.cardhash + ":" +rhash;
+            p.cardhash = p.cardhash + ":[hit]" +rhash;
             p.betwin = betwin;
         });
     }
 }
 
 
-void pokergame1::depositg2(const currency::transfer &t, uint32_t trounds) {
+void pokergame1::depositg2(const currency::transfer &t, uint32_t gameid, uint32_t trounds) {
 
     account_name user = t.from;
     string usercomment = t.memo;
     auto amount = t.quantity.amount;
+
+/*
+    if (gameid == 0) {
+        eosio_assert(amount >= 100, "Below minimum bet threshold!");
+        eosio_assert(amount <= 100000, "Exceeds bet cap!");
+    } else if (gameid == 1) {
+        eosio_assert(amount >= 500, "Below minimum bet threshold!");
+        eosio_assert(amount <= 500000, "Exceeds bet cap!");
+    }
+*/
 
     uint32_t actionidx = usercomment.find("action[");
     uint32_t gameaction = 0;
@@ -518,11 +612,11 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t trounds) {
 
     uint64_t betwin = 0;
     eosio_assert(bjstat == 0 || bjstat == 2 || bjstat == 3 || bjstat == 5, "Blackjack: wrong status for transfer");
-    print("========4======");
+
     // Get the hash
     checksum256 roothash = gethash(user, 0, trounds);
     string rhash;
-    char const hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+
     for( int i = 0; i < 32; ++i )
     {
         char const byte = roothash.hash[i];
@@ -540,6 +634,9 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t trounds) {
         getcards(user, roothash, arr1, 4, myset, amount, 208);
         arr = arr1;
 
+        arr[0] = 0;
+        //arr[1] = 10;
+
         uint32_t dcard1 = get_bj_num(arr[0]);
         uint32_t dcard2 = get_bj_num(arr[1]);
         uint32_t pcard1 = get_bj_num(arr[2]);
@@ -553,7 +650,7 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t trounds) {
         if (dcard1 == 0) {
             newbjstat = 2;
         } else if (dcard2 == 0 && dcard1 >= 9) {
-            if ((pcard1 == 0 && pcard2 >= 9) ||  (pcard1 == 0 && pcard2 >= 9)) {
+            if ((pcard1 == 0 && pcard2 >= 9) ||  (pcard2 == 0 && pcard1 >= 9)) {
                 betwin = t.quantity.amount;
             } else {
                 betwin = 0;
@@ -562,7 +659,7 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t trounds) {
             dcnt = 2;
 
             newbjstat = 1;
-        } else if ((pcard1 == 0 && pcard2 >= 9) ||  (pcard1 == 0 && pcard2 >= 9)) {
+        } else if ((pcard1 == 0 && pcard2 >= 9) ||  (pcard2 == 0 && pcard1 >= 9)) {
             betwin = t.quantity.amount * 2.5;
             newbjstat = 1;
         } else if (pcard1 == pcard2) {
@@ -579,7 +676,7 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t trounds) {
            p.dcnt = dcnt;
            p.pcards1 = pcards;
            p.pcnt1 = pcnt;
-           p.cardhash = rhash;
+           p.cardhash = "[draw]" + rhash;
            p.bet = amount;
            p.betwin = betwin;
         });
@@ -587,6 +684,7 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t trounds) {
         eosio_assert(gameaction == 2, "Blackjack: wrong action");
         eosio_assert(itr_bjpool->pcnt1 == 2, "Blackjack: player should only have 2 cards.");
         eosio_assert(itr_bjpool->dcnt == 1, "Blackjack: dealer should only have 1 open card.");
+        eosio_assert(amount == (itr_bjpool->bet / 2), "Blackjack: insurance should be half of bet.");
 
         myset.clear();
         myset.insert((uint32_t)(itr_bjpool->dcards & 0xff));
@@ -595,19 +693,21 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t trounds) {
 
         uint32_t darrnew[1];
         getcards(user, roothash, darrnew, 1, myset, 0, 208);
-        if ((darrnew[0] % 13) >= 9) {
-            // TODO: insurance win;
-
-        }
 
         uint32_t dcard1 = get_bj_num(itr_bjpool->dcards & 0xff);
         uint32_t dcard2 = get_bj_num(darrnew[0]);
         uint32_t pcard1 = get_bj_num(itr_bjpool->pcards1 & 0xff);
         uint32_t pcard2 = get_bj_num((itr_bjpool->pcards1 >> 8) & 0xff);
 
-        if (dcard2 == 0 && dcard1 >= 9) {
-            if ((pcard1 == 0 && pcard2 >= 9) ||  (pcard1 == 0 && pcard2 >= 9)) {
-                betwin = itr_bjpool->bet * 2;
+        eosio_assert(dcard1 == 0, "Blackjack: dealer first card must be A.");
+
+        uint64_t insurancewin = 0;
+        if (dcard2 >= 9) {
+            // decide if we need to pay insurance
+            insurancewin = amount * 2;
+
+            if ((pcard1 == 0 && pcard2 >= 9) || (pcard2 == 0 && pcard1 >= 9)) {
+                betwin = itr_bjpool->bet;
             } else {
                 betwin = 0;
             }
@@ -615,14 +715,29 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t trounds) {
             dcnt = 2;
 
             newbjstat = 1;
+        } else if ((pcard1 == 0 && pcard2 >= 9) ||  (pcard2 == 0 && pcard1 >= 9)) {
+            betwin = t.quantity.amount * 2.5;
+            newbjstat = 1;
+        } else if (pcard1 == pcard2) {
+            // TODO: support splittable
+            //newbjstat = 5;
+            dcards = dcard1;
+            dcnt = 1;
+            newbjstat = 3;
+        } else {
+            dcards = dcard1;
+            dcnt = 1;
+            newbjstat = 3;
         }
 
         bjpools.modify(itr_bjpool, _self, [&](auto &p) {
             p.status = newbjstat;
             p.dcards = dcards;
             p.dcnt = dcnt;
-            p.cardhash = p.cardhash + ":[a2]" + rhash;
+            p.cardhash = p.cardhash + ":[insure]" + rhash;
             p.betwin = betwin;
+            p.insurance = p.bet;
+            p.insurancewin = insurancewin;
         });
     } else if (bjstat == 3) {
         // Double
@@ -652,7 +767,7 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t trounds) {
                 p.status = 1;
                 p.pcards1 = (p.pcards1 | (parrnew[2] << 16));
                 p.pcnt1 = 3;
-                p.cardhash = p.cardhash + ":[a3]" +rhash;
+                p.cardhash = p.cardhash + ":[double]" +rhash;
                 p.betwin = 0;
             });
         } else {
@@ -670,14 +785,14 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t trounds) {
             uint64_t dcards = darr[0];
             for (int i = 0; i < 20; i++) {
                 // 1st card A, 2nd card cannot be 10,J,Q,K
-                if (d0num == 0 && (darrtemp[i] % 13) >= 9) continue;
+                if (d0num == 0 && dindex == 1 && (darrtemp[i] % 13) >= 9) continue;
                 // 1st car 10,J,Q,K, 2nd card cannot be A;
-                if (d0num >=9 && (darrtemp[i] % 13) == 0) continue;
+                if (d0num >=9 && dindex == 1 && (darrtemp[i] % 13) == 0) continue;
 
                 dcards |= (((uint64_t)darrtemp[i]) << (8 * dindex));
 
                 darr[dindex++] = darrtemp[i];
-                dresult = bj_get_result(darr, 1 + dindex);
+                dresult = bj_get_result(darr, dindex);
                 if (dresult >= 17) {
                     break;
                 }
@@ -700,13 +815,11 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t trounds) {
                 p.dcnt = dindex;
                 p.pcards1 = (p.pcards1 | (parrnew[2] << 16));
                 p.pcnt1 = 3;
-                p.cardhash = p.cardhash + ":[a3]" +rhash;
+                p.cardhash = p.cardhash + ":[double]" +rhash;
                 p.betwin = betwin;
             });
         }
     }
-
-    print("========10======");
 
     auto itr_paccount = paccounts.find(user);
     if (itr_paccount == paccounts.end()) {
@@ -732,20 +845,22 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t trounds) {
 }
 
 
-void pokergame1::denyinsurance(const account_name from, uint32_t externalsrc) {
+void pokergame1::bjuninsure(const account_name from, uint32_t externalsrc) {
 
     require_auth(from);
+    sanity_check(N(eosvegasjack), N(bjuninsure));
 
     auto itr_bjpool = bjpools.find(from);
 
     uint32_t bjstat = bj_get_stat(itr_bjpool->status);
-    eosio_assert(bjstat == 2, "Blackjack: wrong status to deny insurance.");
+    eosio_assert(bjstat == 2, "Blackjack: wrong status to deny insurance");
+    eosio_assert(itr_bjpool->dcnt == 1, "Blackjack: dealer should only have 1 card.");
+    eosio_assert(itr_bjpool->pcnt1 == 2, "Blackjack: player should only have 2 cards.");
 
-    std::set<uint32_t> myset;
-
+    // generate hash
     checksum256 roothash = gethash(from, externalsrc, 0);
     string rhash;
-    char const hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+
     for( int i = 0; i < 32; ++i )
     {
         char const byte = roothash.hash[i];
@@ -753,12 +868,13 @@ void pokergame1::denyinsurance(const account_name from, uint32_t externalsrc) {
         rhash += hex_chars[ ( byte & 0x0F ) >> 0 ];
     }
 
+    std::set<uint32_t> myset;
     myset.insert((uint32_t)(itr_bjpool->dcards & 0xff));
 
-    eosio_assert(itr_bjpool->pcnt1 == 2, "Blackjack: player should only have 2 cards.");
     uint32_t parr[itr_bjpool->pcnt1];
     // get player cards, not number here!
     bj_get_cards(itr_bjpool->pcards1, itr_bjpool->pcnt1, parr);
+
     for (int i = 0; i < itr_bjpool->pcnt1; i++) {
         myset.insert(parr[i]);
     }
@@ -766,35 +882,36 @@ void pokergame1::denyinsurance(const account_name from, uint32_t externalsrc) {
     uint32_t darrnew[1];
     getcards(from, roothash, darrnew, 1, myset, 0, 208);
 
-    uint32_t dcard1 = itr_bjpool->dcards & 0xff;
-    uint32_t dcard2 = darrnew[0];
-    uint32_t pcard1 = parr[0];
-    uint32_t pcard2 = parr[1];
+    uint32_t dcard1 = get_bj_num(itr_bjpool->dcards & 0xff);
+    uint32_t dcard2 = get_bj_num(darrnew[0]);
+    uint32_t pcard1 = get_bj_num(parr[0]);
+    uint32_t pcard2 = get_bj_num(parr[1]);
     uint32_t newbjstat = 0;
     uint64_t betwin = 0;
     uint64_t dcards = itr_bjpool->dcards;
     uint32_t dcnt = itr_bjpool->dcnt;
 
-    if (dcard1 == 0) {
-        newbjstat = 2;
-    } else if (dcard2 == 0 && dcard1 >= 9) {
-        if ((pcard1 == 0 && pcard2 >= 9) ||  (pcard1 == 0 && pcard2 >= 9)) {
+    if (dcard2 >= 9) {
+        if ((pcard1 == 0 && pcard2 >= 9) ||  (pcard2 == 0 && pcard1 >= 9)) {
             betwin = itr_bjpool->bet;
         } else {
             betwin = 0;
         }
-        dcards = dcard1 | (dcard2 << 8);
+        dcards = itr_bjpool->dcards | (darrnew[0] << 8);
         dcnt = 2;
 
         newbjstat = 1;
-    } else if ((pcard1 == 0 && pcard2 >= 9) ||  (pcard1 == 0 && pcard2 >= 9)) {
+    } else if ((pcard1 == 0 && pcard2 >= 9) ||  (pcard2 == 0 && pcard1 >= 9)) {
+        print("====haha2==");
         betwin = itr_bjpool->bet * 2.5;
         newbjstat = 1;
     } else if (pcard1 == pcard2) {
+        print("====haha3==");
         // TODO: support splittable
         //newbjstat = 5;
         newbjstat = 3;
     } else {
+        print("====haha4==");
         newbjstat = 3;
     }
 
@@ -802,11 +919,92 @@ void pokergame1::denyinsurance(const account_name from, uint32_t externalsrc) {
         p.status = newbjstat;
         p.dcards = dcards;
         p.dcnt = dcnt;
-        p.cardhash = p.cardhash + ":[a2]" + rhash;
+        p.cardhash = p.cardhash + ":[no_insurance]" + rhash;
         p.betwin = betwin;
     });
 }
 
+void pokergame1::bjreceipt(string game_id, const name from, string game, string hash, std::vector<uint32_t> dealer_hand,
+        std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2, string bet, string win) {
+    require_auth(from);
+    sanity_check(N(eosvegasjack), N(bjreceipt));
+
+    auto itr_bjpool = bjpools.find(from);
+    eosio_assert(itr_bjpool != bjpools.end(), "Blackjack: cannot find user pool");
+
+    // input check
+    uint64_t dcards_in = 0;
+    uint64_t pcards1_in = 0;
+    uint64_t pcards2_in = 0;
+    for(std::vector<uint32_t>::size_type i = 0; i != dealer_hand.size(); i++) {
+        dcards_in |= (((uint64_t)dealer_hand[i]) << (i * 8));
+    }
+    for(std::vector<uint32_t>::size_type i = 0; i != player_hand1.size(); i++) {
+        pcards1_in |= (((uint64_t)player_hand1[i]) << (i * 8));
+    }
+    if (player_hand2.size() > 0) {
+        for(std::vector<uint32_t>::size_type i = 0; i != player_hand2.size(); i++) {
+            pcards2_in |= (((uint64_t)player_hand2[i]) << (i * 8));
+        }
+    }
+    eosio_assert(dcards_in == itr_bjpool->dcards, "Blackjack: dealer cards mismatch");
+    eosio_assert(pcards1_in == itr_bjpool->pcards1, "Blackjack: 1st hand mismatches");
+    eosio_assert(pcards2_in == itr_bjpool->pcards2, "Blackjack: 2nd hand mismatches");
+
+    uint64_t betnum = 0;
+    uint64_t winnum = 0;
+    uint32_t pos1 = bet.find(" EOS");
+    eosio_assert(pos1 > 0 && pos1 != 4294967295, "bet is incorrect");
+
+    string ucm = bet.substr(0, pos1);
+
+    uint32_t pos2 = ucm.find(".");
+    string ucm1 = ucm.substr(0, pos2);
+    string ucm2 = ucm.substr(pos2+1, 4);
+    eosio_assert(pos1 - pos2 == 5, "Bet in wrong format");
+
+    betnum = stoi(ucm1) * 10000 + stoi(ucm2);
+
+    pos1 = win.find(" EOS");
+    eosio_assert(pos1 > 0 && pos1 != 4294967295, "bet is incorrect");
+
+    ucm = win.substr(0, pos1);
+
+    pos2 = ucm.find(".");
+    ucm1 = ucm.substr(0, pos2);
+    ucm2 = ucm.substr(pos2+1, 4);
+    eosio_assert(pos1 - pos2 == 5, "Bet in wrong format");
+
+    winnum = stoi(ucm1) * 10000 + stoi(ucm2);
+
+    eosio_assert(betnum == itr_bjpool->bet, "Blackjack: bet does not match.");
+    eosio_assert(winnum == itr_bjpool->betwin, "Blackjack: win does not match.");
+    eosio_assert(hash == itr_bjpool->cardhash, "Blackjack: hash doesn't match.");
+
+    asset bal = asset(itr_bjpool->betwin, symbol_type(S(4, EOS)));
+    if (bal.amount > 0) {
+        // withdraw
+        action(permission_level{_self, N(active)}, N(eosio.token),
+               N(transfer), std::make_tuple(_self, from, bal,
+                                            std::string("Winner winner chicken dinner! 大吉大利，今晚吃鸡！ - blackjack.MyEosVegas.com")))
+                .send();
+    }
+
+    auto itr_paccount = paccounts.find(from);
+    auto itr_metadata = metadatas.find(0);  // we use Jacks-or-Better metadata to represent all games eosin
+
+    /*
+    uint64_t mineprice = getminingtableprice(itr_metadata->teosin);
+    uint64_t minemev = eosin * mineprice * (1 + itr_paccount->level * 0.05) / 100;
+    asset bal2 = asset(minemev, symbol_type(S(4, MEV)));
+    action(permission_level{_self, N(active)}, N(eosvegascoin),
+           N(transfer), std::make_tuple(N(eosvegasjack), from, bal2,
+                                        std::string("Gaming deserves rewards! - blackjack.MyEosVegas.com")))
+            .send();
+    */
+
+    bjpools.erase(itr_bjpool);
+}
 
 void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_t bettype) {
     // run sanity check here
@@ -816,6 +1014,9 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
 
     auto itr_blacklist = blacklists.find(t.from);
     eosio_assert(itr_blacklist == blacklists.end(), "Sorry, please be patient.");
+
+    sanity_check(N(eosio.token), N(transfer));
+    sanity_check(N(eosio.token), N(transfer));
 
     // No bet from eosvegascoin
     if (t.from == N(eosvegascoin)) {
@@ -840,7 +1041,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
     uint32_t gameid = 0;    // 0: jacks-or-better; 1: jacks-or-better 5x
     if (usercomment.find("type[") == 0) {
         uint32_t pos = usercomment.find("]");
-        if (pos > 0) {
+        if (pos > 0 && pos != 4294967295) {
             string ucm = usercomment.substr(5, pos - 5);
             gameid = stoi(ucm);
         }
@@ -894,8 +1095,11 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
                 p.cardhash = "";
             });
         }
+        // eosio_assert(gameid == 2, "Blackjack only");
 
-        depositg2(t, itr_metadata->trounds);
+        eosio_assert(user == N(blockfishbgp), "Blackjack under testing");
+
+        depositg2(t, gameid, itr_metadata->trounds);
     }
 }
 
@@ -1043,7 +1247,7 @@ void pokergame1::report(name from, uint64_t minemev, uint64_t meosin, uint64_t m
 void pokergame1::dealreceipt(const name from, string game, string hash1, string hash2, string cards, string result, string betineos, string winineos) {
     require_auth(from);
     require_recipient(from);
-    sanity_check(N(dealreceipt));
+    sanity_check(N(eosvegasjack), N(dealreceipt));
 
     /*
      ["blockfishbgp", "Jacks-or-Better", "hash1 here", "hash2 here", "{ 29[H4],12[S13],8[S9],5[S6],33[H8] }", "X0", "0.1 EOS", "0.0 EOS"]
@@ -1061,8 +1265,8 @@ void pokergame1::dealreceipt(const name from, string game, string hash1, string 
     uint64_t betnum = 0;
     uint64_t winnum = 0;
     uint32_t pos1 = betineos.find(" EOS");
-    eosio_assert(pos1 > 0, "bet is incorrect");
-    if (pos1 > 0) {
+    eosio_assert(pos1 > 0 && pos1 != 4294967295, "bet is incorrect");
+    if (pos1 > 0 && pos1 != 4294967295) {
         string ucm = betineos.substr(0, pos1);
 
         uint32_t pos2 = ucm.find(".");
@@ -1073,7 +1277,7 @@ void pokergame1::dealreceipt(const name from, string game, string hash1, string 
         betnum = stoi(ucm1) * 10000 + stoi(ucm2);
     }
     pos1 = winineos.find(" EOS");
-    eosio_assert(pos1 > 0, "bet is incorrect");
+    eosio_assert(pos1 > 0 && pos1 != 4294967295, "bet is incorrect");
     if (pos1 > 0) {
         string ucm = winineos.substr(0, pos1);
 
@@ -1121,7 +1325,8 @@ void pokergame1::dealreceipt(const name from, string game, string hash1, string 
         }
     }
 
-
+    pools.erase(itr_user);
+    /*
     pools.modify(itr_user, _self, [&](auto &p) {
         p.cardhash1 = "";
         p.cardhash2 = "";
@@ -1134,12 +1339,13 @@ void pokergame1::dealreceipt(const name from, string game, string hash1, string 
         p.card4 = 0;
         p.card5 = 0;
     });
+    */
 
     if (bal.amount > 0) {
         // withdraw
         action(permission_level{_self, N(active)}, N(eosio.token),
                N(transfer), std::make_tuple(_self, from, bal,
-                                            std::string("Winner winner chicken dinner! - jacks.MyEosVegas.com")))
+                                            std::string("Winner winner chicken dinner! 大吉大利，今晚吃鸡！- jacks.MyEosVegas.com")))
                 .send();
     }
 
@@ -1157,7 +1363,7 @@ void pokergame1::dealreceipt(const name from, string game, string hash1, string 
 void pokergame1::receipt5x(const name from, string game, string hash1, string hash2, string cards1, string cards2, string cards3, string cards4, string cards5, string results, string betineos, string winineos) {
     require_auth(from);
     require_recipient(from);
-    sanity_check(N(receipt5x));
+    sanity_check(N(eosvegasjack), N(receipt5x));
 
 
     auto itr_pool = pools.find(from);
@@ -1203,6 +1409,10 @@ void pokergame1::receipt5x(const name from, string game, string hash1, string ha
     // clear balance
     asset bal = asset(itr_pool->betwin, symbol_type(S(4, EOS)));
     uint64_t eosin = itr_pool->bet;
+
+    pools.erase(itr_pool);
+    pool5xs.erase(itr_pool5x);
+    /*
     pools.modify(itr_pool, _self, [&](auto &p) {
         p.cardhash1 = "";
         p.cardhash2 = "";
@@ -1215,6 +1425,7 @@ void pokergame1::receipt5x(const name from, string game, string hash1, string ha
         p.card4 = 0;
         p.card5 = 0;
     });
+    */
 
     uint32_t tsnow = now();
     // 1540512000
@@ -1270,7 +1481,7 @@ void pokergame1::receipt5x(const name from, string game, string hash1, string ha
         // withdraw
         action(permission_level{_self, N(active)}, N(eosio.token),
                N(transfer), std::make_tuple(_self, from, bal,
-                                            std::string("Winner winner chicken dinner! - jacks.MyEosVegas.com")))
+                                            std::string("Winner winner chicken dinner! 大吉大利，今晚吃鸡! - jacks.MyEosVegas.com")))
                 .send();
     }
 
@@ -1347,7 +1558,7 @@ uint32_t pokergame1::checkwin(uint32_t c1, uint32_t c2, uint32_t c3, uint32_t c4
 
 void pokergame1::drawcards5x(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5) {
     require_auth(from);
-    sanity_check(N(drawcards5x));
+    sanity_check(N(eosvegasjack), N(drawcards5x));
 
     auto itr_blacklist = blacklists.find(from);
     eosio_assert(itr_blacklist == blacklists.end(), "Sorry, please be patient.");
@@ -1377,7 +1588,7 @@ void pokergame1::drawcards5x(const name from, uint32_t externalsrc, string dump1
 
     checksum256 roothash = gethash(from, externalsrc, itr_metadata->trounds);
     string rhash;
-    char const hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+
     for( int i = 0; i < 32; ++i )
     {
         char const byte = roothash.hash[i];
@@ -1539,7 +1750,7 @@ void pokergame1::drawcards5x(const name from, uint32_t externalsrc, string dump1
 void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5) {
     require_auth(from);
 
-    sanity_check(N(drawcards));
+    sanity_check(N(eosvegasjack), N(drawcards));
 
     auto itr_blacklist = blacklists.find(from);
     eosio_assert(itr_blacklist == blacklists.end(), "Sorry, please be patient.");
@@ -1567,7 +1778,7 @@ void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, 
 
     checksum256 roothash = gethash(from, externalsrc, itr_metadata->trounds);
     string rhash;
-    char const hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+
     for( int i = 0; i < 32; ++i )
     {
         char const byte = roothash.hash[i];
@@ -1773,13 +1984,20 @@ uint32_t pokergame1::parsecard(string s) {
 
 void pokergame1::clear() {
 
-//    require_auth(_self);
-
+    require_auth(_self);
     /*
+
     auto itr = pools.begin();
     while (itr != pools.end()) {
-        itr = pools.erase(itr);
+        if (itr->bet == 0) {
+            itr = pools.erase(itr);
+        } else {
+            itr++;
+        }
     }
+
+
+
     auto itr2 = events.begin();
     while (itr2 != events.end()) {
         itr2 = events.erase(itr2);
@@ -1830,45 +2048,58 @@ void pokergame1::ramclean() {
 
     int cnt = 0;
     auto itr = pools.begin();
+
+
+    while (itr != pools.end() && cnt < 500) {
+        if (itr->owner == N(architecture) || (itr->bet == 0 && itr->cardhash1.length() == 0 && itr->cardhash2.length() == 0)) {
+            itr = pools.erase(itr);
+        } else {
+            itr++;
+        }
+        cnt++;
+    }
+
+
     //for (int i = 0; i < 1; i++) {
     //    itr++;
     //}
-    while (itr != pools.end()) {
+    /*
+while (itr != pools.end()) {
 
-        if (itr->cardhash1.length() != 0 && itr->cardhash2.length() != 0) {
-            pools.modify(itr, _self, [&](auto &p) {
-                p.cardhash1 = "";
-                p.cardhash2 = "";
-                p.bet = 0;
-                p.betwin = 0;
-                p.wintype = 0;
-                p.card1 = 0;
-                p.card2 = 0;
-                p.card3 = 0;
-                p.card4 = 0;
-                p.card5 = 0;
-            });
+    if (itr->cardhash1.length() != 0 && itr->cardhash2.length() != 0) {
+        pools.modify(itr, _self, [&](auto &p) {
+            p.cardhash1 = "";
+            p.cardhash2 = "";
+            p.bet = 0;
+            p.betwin = 0;
+            p.wintype = 0;
+            p.card1 = 0;
+            p.card2 = 0;
+            p.card3 = 0;
+            p.card4 = 0;
+            p.card5 = 0;
+        });
 
-        }
-        itr++;
+    }
+    itr++;
+}
+
+
+uint32_t cnt = 0;
+for (auto itr = gaccounts.begin();  cnt < ; itr++) {
+    uint32_t lev = getlevel(itr->teosin);
+
+    auto itr_paccount = paccounts.find(itr->owner);
+    if (itr_paccount == paccounts.end()) {
+        auto itr_paccount = paccounts.emplace(_self, [&](auto &p){
+            p.owner = itr->owner;
+            p.level = lev;
+            p.exp = itr->teosin * 50;
+        });
     }
 
-    /*
-    uint32_t cnt = 0;
-    for (auto itr = gaccounts.begin();  cnt < ; itr++) {
-        uint32_t lev = getlevel(itr->teosin);
-
-        auto itr_paccount = paccounts.find(itr->owner);
-        if (itr_paccount == paccounts.end()) {
-            auto itr_paccount = paccounts.emplace(_self, [&](auto &p){
-                p.owner = itr->owner;
-                p.level = lev;
-                p.exp = itr->teosin * 50;
-            });
-        }
-
-        cnt++;
-        */
+    cnt++;
+    */
         /*else {
             paccounts.modify(itr_paccount, _self, [&](auto &p) {
                 p.level = lev;
@@ -1921,7 +2152,6 @@ void pokergame1::ramclean() {
 void pokergame1::init() {
     require_auth(_self);
 
-
     uint32_t aa[4] = {301, 36, 5, 0};
     for( int i = 0; i < 4; ++i ) {
         pevents.emplace(_self, [&](auto &p) {
@@ -1929,7 +2159,6 @@ void pokergame1::init() {
             p.count = aa[i];
         });
     }
-
 }
 
 void pokergame1::setgameon(uint64_t id, uint32_t flag) {
@@ -2012,7 +2241,7 @@ void pokergame1::setseed(const name from, uint32_t seed) {
 void pokergame1::getbonus(const name from, const uint32_t type, uint32_t externalsrc) {
     require_auth(from);
 
-    sanity_check(N(getbonus));
+    sanity_check(N(eosvegasjack), N(getbonus));
 
     auto itr_pool = pools.find(from);
     auto itr_paccount = paccounts.find(from);
@@ -2132,12 +2361,6 @@ extern "C" { \
 
 
 
-
-
-
-
-
-
 //EOSIO_ABI_EX(pokergame1, (dealreceipt)(drawcards)(clear)(setseed)(setcards)(init)(setgameon)(setminingon)(signup))
 //EOSIO_ABI_EX(pokergame1, (dealreceipt)(receipt5x)(drawcards)(drawcards5x)(clear)(setseed)(init)(setgameon)(setminingon)(signup)(getbonus))
-EOSIO_ABI_EX(pokergame1, (dealreceipt)(receipt5x)(drawcards)(drawcards5x)(setseed)(setgameon)(setminingon)(signup)(getbonus)(myeosvegas)(ramclean)(blacklist)(init)(clear)(bjstand)(bjhit)(denyinsurance))
+EOSIO_ABI_EX(pokergame1, (dealreceipt)(receipt5x)(drawcards)(drawcards5x)(setseed)(setgameon)(setminingon)(signup)(getbonus)(myeosvegas)(ramclean)(blacklist)(init)(clear)(bjstand)(bjhit)(bjuninsure)(bjreceipt))
