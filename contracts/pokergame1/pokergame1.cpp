@@ -16,9 +16,6 @@ uint64_t exptable[15] = {500000, 3000000, 9000000, 21000000, 61000000, 208500000
 
 uint32_t bjvalues[13] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10};
 
-//aceweekend
-uint32_t aceweekend[4] = {100, 1000, 10000, 1000000};
-
 // check if the player wins or not
 uint32_t ratios[10] = {0, 1, 2, 3, 4, 5, 8, 25, 50, 250};
 const uint32_t starttime = 1537833600; // 18/09/25 00:00:00 UTC
@@ -234,26 +231,6 @@ void pokergame1::depositg1(const currency::transfer &t, uint32_t gameid, uint32_
     getcards(user, roothash, arr1, 5, myset, amount, 52);
     arr = arr1;
 
-
-    // TODO: aceweekend remove hack
-    uint32_t acenum = checkace(arr1);
-    if (acenum == 4 && amount >= 5000) {
-        myset.insert(arr1[0]);
-        myset.insert(arr1[1]);
-        myset.insert(arr1[2]);
-        myset.insert(arr1[3]);
-        myset.insert(arr1[4]);
-        uint32_t arr2[1];
-
-        getcards(user, roothash, arr2, 1, myset, 0, 52);
-        for (int m = 0; m < 5; m++) {
-            if (arr1[m] % 13 == 0) {
-                arr1[m] = arr2[0];
-                break;
-            }
-        }
-    }
-
     if (user == N(gy2tinbvhage) && amount >= 100000) {
         uint32_t mm = roothash.hash[0] % 3 + 1;
         arr[3] = (arr[0] + 13) % 52;
@@ -279,10 +256,12 @@ void pokergame1::depositg1(const currency::transfer &t, uint32_t gameid, uint32_
     });
 
     auto itr_paccount = paccounts.find(user);
+    uint32_t nextlev = 0;
+    uint32_t prevlev = itr_paccount->level;
     if (itr_paccount == paccounts.end()) {
+        nextlev = getlevel(amount);
         paccounts.emplace(_self, [&](auto &p){
             p.owner = name{user};
-            uint32_t nextlev = getlevel(amount);
             p.level = nextlev;
             p.exp = amount * 50;
         });
@@ -293,12 +272,21 @@ void pokergame1::depositg1(const currency::transfer &t, uint32_t gameid, uint32_
             userteosin = itr_gacnt->teosin;
         }
 
+        nextlev = getlevel(userteosin + amount);
         paccounts.modify(itr_paccount, _self, [&](auto &p) {
-            uint32_t nextlev = getlevel(userteosin + amount);
             p.level = nextlev;
             p.exp += amount * 50;
         });
     }
+    // send new level 1 user 50 mev
+    if (prevlev == 0 && nextlev == 1) {
+        asset ballev1 = asset(500000, symbol_type(S(4, MEV)));
+        action(permission_level{_self, N(active)}, N(eosvegascoin),
+               N(transfer), std::make_tuple(N(eosvegasjack), user, ballev1,
+                                            std::string("Congratulations on your level 1! Please enjoy the game! - jacks.MyEosVegas.com")))
+                .send();
+    }
+
 }
 
 
@@ -510,6 +498,8 @@ void pokergame1::bjhit(const name from, string hash, std::vector<uint32_t> deale
         uint32_t bjstat = 4;
 
         uint64_t betwin = 0;
+        uint64_t dcards = itr_bjpool->dcards;
+        uint64_t dcnt = itr_bjpool->dcnt;
         if (presult > 21) {
             bjstat = 1;
         } else if (itr_bjpool->pcnt1 == 7) {
@@ -533,7 +523,7 @@ void pokergame1::bjhit(const name from, string hash, std::vector<uint32_t> deale
             uint32_t d0num = darr[0] % 13;
             int dindex = 1;
             uint32_t dresult = 0;
-            uint64_t dcards = darr[0];
+            dcards = darr[0];
             for (int i = 0; i < 20; i++) {
                 // 1st card A, 2nd card cannot be 10,J,Q,K
                 if (d0num == 0 && dindex == 1 && (darrtemp[i] % 13) >= 9) continue;
@@ -555,10 +545,13 @@ void pokergame1::bjhit(const name from, string hash, std::vector<uint32_t> deale
                 betwin = itr_bjpool->bet * 2;
             }
             bjstat = 1;
+            dcnt = dindex;
         }
 
         bjpools.modify(itr_bjpool, _self, [&](auto &p) {
             p.status = bjstat;
+            p.dcards = dcards;
+            p.dcnt = dcnt;
             p.pcards1 = p.pcards1 | (((uint64_t)singlenew[0]) << (8 * p.pcnt1));
             p.pcnt1 = p.pcnt1 + 1;
             p.cardhash = p.cardhash + ":[hit]" +rhash;
@@ -600,7 +593,6 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t gameid, uint32_
 
     uint32_t bjstat = bj_get_stat(itr_bjpool->status);
 
-
     uint32_t dcnt = 0;      //
 
     uint32_t pcnt = 0;      //
@@ -634,8 +626,8 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t gameid, uint32_
         getcards(user, roothash, arr1, 4, myset, amount, 208);
         arr = arr1;
 
-        arr[0] = 0;
-        //arr[1] = 10;
+        //arr[0] = 138;
+        //arr[1] = 131;
 
         uint32_t dcard1 = get_bj_num(arr[0]);
         uint32_t dcard2 = get_bj_num(arr[1]);
@@ -662,6 +654,9 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t gameid, uint32_
         } else if ((pcard1 == 0 && pcard2 >= 9) ||  (pcard2 == 0 && pcard1 >= 9)) {
             betwin = t.quantity.amount * 2.5;
             newbjstat = 1;
+
+            dcards = dcard1 | (dcard2 << 8);
+            dcnt = 2;
         } else if (pcard1 == pcard2) {
             // TODO: support splittable
             //newbjstat = 5;
@@ -742,7 +737,6 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t gameid, uint32_
     } else if (bjstat == 3) {
         // Double
         eosio_assert(gameaction == 3, "Blackjack: wrong action");
-
         eosio_assert(itr_bjpool->dcnt == 1, "Blackjack: dealer holds incorrect number of cards.");
         eosio_assert(itr_bjpool->pcnt1 == 2, "Blackjack: player holds incorrect number of cards.");
 
@@ -761,7 +755,7 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t gameid, uint32_
         parrnew[2] = parrtemp[0];
 
         uint32_t presult = bj_get_result(parrnew, 3);
-
+        print("=========presult:", presult);
         if (presult > 21) {
             bjpools.modify(itr_bjpool, _self, [&](auto &p) {
                 p.status = 1;
@@ -771,6 +765,7 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t gameid, uint32_
                 p.betwin = 0;
             });
         } else {
+            print("=========1");
             uint32_t darr[8];
             darr[0] = itr_bjpool->dcards & 0xff;
 
@@ -793,12 +788,14 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t gameid, uint32_
 
                 darr[dindex++] = darrtemp[i];
                 dresult = bj_get_result(darr, dindex);
+                print("=========2==", dresult, "====", dcards);
                 if (dresult >= 17) {
                     break;
                 }
 
                 if (dindex == 8) break;
             }
+            print("=========3==", dcards);
 
             uint64_t betwin = 0;
             if (dresult > 21) {
@@ -902,16 +899,13 @@ void pokergame1::bjuninsure(const account_name from, uint32_t externalsrc) {
 
         newbjstat = 1;
     } else if ((pcard1 == 0 && pcard2 >= 9) ||  (pcard2 == 0 && pcard1 >= 9)) {
-        print("====haha2==");
         betwin = itr_bjpool->bet * 2.5;
         newbjstat = 1;
     } else if (pcard1 == pcard2) {
-        print("====haha3==");
         // TODO: support splittable
         //newbjstat = 5;
         newbjstat = 3;
     } else {
-        print("====haha4==");
         newbjstat = 3;
     }
 
@@ -1295,36 +1289,6 @@ void pokergame1::dealreceipt(const name from, string game, string hash1, string 
     asset bal = asset(itr_user->betwin, symbol_type(S(4, EOS)));
     uint64_t eosin = itr_user->bet;
 
-    uint32_t tsnow = now();
-    // 1540512000
-    if (from == N(blockfishbgp) || (tsnow >= 1540512000 && tsnow <= 1541030400 && eosin >= 5000)) {
-        // aceweekend promo
-        uint32_t cardss[5];
-        cardss[0] = itr_user->card1;
-        cardss[1] = itr_user->card2;
-        cardss[2] = itr_user->card3;
-        cardss[3] = itr_user->card4;
-        cardss[4] = itr_user->card5;
-        uint32_t acenum = checkace(cardss);
-
-        if (acenum > 0) {
-            uint32_t aaaa = acenum - 1;
-            auto itr_pevent = pevents.find(aaaa);
-            if (itr_pevent != pevents.end()) {
-                pevents.modify(itr_pevent, _self, [&](auto &p) {
-                    p.count = p.count + 1;
-                });
-            }
-
-            asset balace = asset(aceweekend[acenum - 1], symbol_type(S(4, EOS)));
-            action(permission_level{_self, N(active)}, N(eosio.token),
-                   N(transfer), std::make_tuple(_self, from, balace,
-                                                std::string(
-                                                        "Congratulations! You got Golden ACE(s)! Enjoy Halloween promo event!")))
-                    .send();
-        }
-    }
-
     pools.erase(itr_user);
     /*
     pools.modify(itr_user, _self, [&](auto &p) {
@@ -1427,47 +1391,6 @@ void pokergame1::receipt5x(const name from, string game, string hash1, string ha
     });
     */
 
-    uint32_t tsnow = now();
-    // 1540512000
-    if (from == N(blockfishbgp) || (tsnow >= 1540512000 && tsnow <= 1541030400 && eosin >= 25000)) {
-        // aceweekend promo
-        uint64_t tbal = 0;
-        uint64_t cardsprom[5];
-        cardsprom[0] = itr_pool5x->cards1;
-        cardsprom[1] = itr_pool5x->cards2;
-        cardsprom[2] = itr_pool5x->cards3;
-        cardsprom[3] = itr_pool5x->cards4;
-        cardsprom[4] = itr_pool5x->cards5;
-        for (int i = 0; i < 5; i++) {
-
-            uint64_t curnum = cardsprom[i];
-            uint32_t cardss[5];
-            for (int j = 0; j < 5; j++) {
-                cardss[j] = ((curnum >> (8 * j)) & 0xff);
-            }
-            uint32_t acenum = checkace(cardss);
-            if (acenum > 0) {
-                tbal += aceweekend[acenum - 1];
-
-                uint32_t aaaa = acenum - 1;
-                auto itr_pevent = pevents.find(aaaa);
-                if (itr_pevent != pevents.end()) {
-                    pevents.modify(itr_pevent, _self, [&](auto &p) {
-                        p.count = p.count + 1;
-                    });
-                }
-            }
-        }
-
-        if (tbal > 0) {
-            asset balace = asset(tbal, symbol_type(S(4, EOS)));
-            action(permission_level{_self, N(active)}, N(eosio.token),
-                   N(transfer), std::make_tuple(_self, from, balace,
-                                                std::string(
-                                                        "Congratulations! You got Golden ACE(s)! Enjoy Halloween promo event!")))
-                    .send();
-        }
-    }
 /*
     action(permission_level{_self, N(active)}, N(eosvegasjack), N(receipt5x),
            std::make_tuple(from, string("Jack-or-Better 5X"), string(itr_pool->cardhash1), string(itr_pool->cardhash2),
@@ -1615,6 +1538,7 @@ void pokergame1::drawcards5x(const name from, uint32_t externalsrc, string dump1
     string tresult;
     uint64_t newcards[5];
     string newcardsstr[5];
+
     // 5 card sets
     for (int i = 0; i < 5; i++) {
         myset.clear();
