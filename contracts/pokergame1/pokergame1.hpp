@@ -53,7 +53,8 @@ public:
              suaccounts(_self, _self),
              blacklists(_self, _self),
              bjpools(_self, _self),
-             pevents(_self, _self){};
+             pevents(_self, _self),
+             puevents(_self, _self){};
 
     //@abi action
     void dealreceipt(const name from, string game, string hash1, string hash2, string cards, string result, string betineos, string winineos);
@@ -338,6 +339,17 @@ private:
         EOSLIB_SERIALIZE(st_pevents, (id)(count)(eosin))
     };
 
+
+    // @abi table pevents i64
+    struct st_puevents {
+        uint64_t id;
+        uint64_t owner;
+        uint64_t type;
+
+        uint64_t primary_key() const { return id; }
+        EOSLIB_SERIALIZE(st_puevents, (id)(owner)(type))
+    };
+
 /*
     // @abi table logbonus i64
     struct st_logbonus {
@@ -385,4 +397,6 @@ private:
 
     typedef multi_index<N(pevents), st_pevents> _tb_pevents;
     _tb_pevents pevents;
+    typedef multi_index<N(puevents), st_puevents> _tb_puevents;
+    _tb_puevents puevents;
 };

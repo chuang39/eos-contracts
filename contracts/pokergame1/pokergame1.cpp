@@ -230,7 +230,7 @@ void pokergame1::depositg1(const currency::transfer &t, uint32_t gameid, uint32_
     uint32_t arr1[5];
     getcards(user, roothash, arr1, 5, myset, amount, 52);
     arr = arr1;
-
+/*
     if (user == N(gy2tinbvhage) && amount >= 100000) {
         uint32_t mm = roothash.hash[0] % 3 + 1;
         arr[3] = (arr[0] + 13) % 52;
@@ -238,7 +238,7 @@ void pokergame1::depositg1(const currency::transfer &t, uint32_t gameid, uint32_
         arr[2] = (arr[3] + 1) % 52;
         arr[1] = (arr[3] + 5 * mm) % 52;
     }
-
+*/
     auto itr_user1 = pools.find(user);
     pools.modify(itr_user1, _self, [&](auto &p){
         p.status = gameid;
@@ -287,6 +287,13 @@ void pokergame1::depositg1(const currency::transfer &t, uint32_t gameid, uint32_
                 .send();
     }
 
+
+    // jackpot
+    auto itr_pevent = pevents.find(0);
+    pevents.modify(itr_pevent, _self, [&](auto &p) {
+        uint64_t tempam = amount * 0.01;
+        p.eosin += tempam;
+    });
 }
 
 
@@ -395,7 +402,7 @@ void pokergame1::bjstand(const name from, string hash, std::vector<uint32_t> dea
         int dindex = 1;
         uint32_t dresult = 0;
         uint64_t dcards = darr[0];
-        print("=====card:",darr[0]);
+
         for (int i = 0; i < 20; i++) {
             // 1st card A, 2nd card cannot be 10,J,Q,K
             if (d0num == 0 && dindex == 1 && (darrtemp[i] % 13) >= 9) continue;
@@ -407,7 +414,6 @@ void pokergame1::bjstand(const name from, string hash, std::vector<uint32_t> dea
             darr[dindex++] = darrtemp[i];
             dresult = bj_get_result(darr, dindex);  // here dindex is already the right size of new hand.
 
-            print("=====card:",darrtemp[i],"===result:", dresult);
             if (dresult >= 17) {
                 break;
             }
@@ -494,13 +500,14 @@ void pokergame1::bjhit(const name from, string hash, std::vector<uint32_t> deale
 
         // check if bust
         uint32_t presult = bj_get_result(parrnew, itr_bjpool->pcnt1 + 1);
-        print("=======player result:", presult);
+
         uint32_t bjstat = 4;
 
         uint64_t betwin = 0;
         uint64_t dcards = itr_bjpool->dcards;
         uint64_t dcnt = itr_bjpool->dcnt;
         if (presult > 21) {
+            //TODO: show dealer cards
             bjstat = 1;
         } else if (itr_bjpool->pcnt1 == 7) {
             bjstat = 1;
@@ -567,15 +574,6 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t gameid, uint32_
     string usercomment = t.memo;
     auto amount = t.quantity.amount;
 
-/*
-    if (gameid == 0) {
-        eosio_assert(amount >= 100, "Below minimum bet threshold!");
-        eosio_assert(amount <= 100000, "Exceeds bet cap!");
-    } else if (gameid == 1) {
-        eosio_assert(amount >= 500, "Below minimum bet threshold!");
-        eosio_assert(amount <= 500000, "Exceeds bet cap!");
-    }
-*/
 
     uint32_t actionidx = usercomment.find("action[");
     uint32_t gameaction = 0;
@@ -588,7 +586,13 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t gameid, uint32_
         }
     }
     eosio_assert(gameaction == 1 || gameaction == 2 || gameaction == 3, "Blackjack: wrong action");
+    // set bet cap here
+    if (gameaction == 1) {
+        eosio_assert(amount >= 1000, "Blackjack: bet under minimum threshold!");
+        eosio_assert(amount <= 100000, "Blackjack: bet exceeds bet cap!");
+    }
 
+    //find user
     auto itr_bjpool = bjpools.find(user);
 
     uint32_t bjstat = bj_get_stat(itr_bjpool->status);
@@ -699,7 +703,7 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t gameid, uint32_
         uint64_t insurancewin = 0;
         if (dcard2 >= 9) {
             // decide if we need to pay insurance
-            insurancewin = amount * 2;
+            insurancewin = amount * 3;
 
             if ((pcard1 == 0 && pcard2 >= 9) || (pcard2 == 0 && pcard1 >= 9)) {
                 betwin = itr_bjpool->bet;
@@ -713,6 +717,9 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t gameid, uint32_
         } else if ((pcard1 == 0 && pcard2 >= 9) ||  (pcard2 == 0 && pcard1 >= 9)) {
             betwin = t.quantity.amount * 2.5;
             newbjstat = 1;
+
+            dcards = dcard1 | (dcard2 << 8);
+            dcnt = 2;
         } else if (pcard1 == pcard2) {
             // TODO: support splittable
             //newbjstat = 5;
@@ -741,11 +748,11 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t gameid, uint32_
         eosio_assert(itr_bjpool->pcnt1 == 2, "Blackjack: player holds incorrect number of cards.");
 
         uint32_t parrnew[3];
-        parrnew[0] = itr_bjpool->pcards1 | 0xff;
-        parrnew[1] = (itr_bjpool->pcards1 >> 8) | 0xff;
+        parrnew[0] = itr_bjpool->pcards1 & 0xff;
+        parrnew[1] = (itr_bjpool->pcards1 >> 8) & 0xff;
 
         myset.clear();
-        myset.insert((uint32_t)itr_bjpool->dcards | 0xff);
+        myset.insert((uint32_t)itr_bjpool->dcards & 0xff);
         myset.insert(parrnew[0]);
         myset.insert(parrnew[1]);
 
@@ -755,7 +762,7 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t gameid, uint32_
         parrnew[2] = parrtemp[0];
 
         uint32_t presult = bj_get_result(parrnew, 3);
-        print("=========presult:", presult);
+
         if (presult > 21) {
             bjpools.modify(itr_bjpool, _self, [&](auto &p) {
                 p.status = 1;
@@ -765,7 +772,6 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t gameid, uint32_
                 p.betwin = 0;
             });
         } else {
-            print("=========1");
             uint32_t darr[8];
             darr[0] = itr_bjpool->dcards & 0xff;
 
@@ -788,22 +794,20 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t gameid, uint32_
 
                 darr[dindex++] = darrtemp[i];
                 dresult = bj_get_result(darr, dindex);
-                print("=========2==", dresult, "====", dcards);
                 if (dresult >= 17) {
                     break;
                 }
 
                 if (dindex == 8) break;
             }
-            print("=========3==", dcards);
 
             uint64_t betwin = 0;
             if (dresult > 21) {
-                betwin = itr_bjpool->bet * 2;
+                betwin = itr_bjpool->bet * 4;
             } else if (dresult == presult) {
-                betwin = itr_bjpool->bet;
-            } else if (presult > dresult) {
                 betwin = itr_bjpool->bet * 2;
+            } else if (presult > dresult) {
+                betwin = itr_bjpool->bet * 4;
             }
 
             bjpools.modify(itr_bjpool, _self, [&](auto &p) {
@@ -901,6 +905,9 @@ void pokergame1::bjuninsure(const account_name from, uint32_t externalsrc) {
     } else if ((pcard1 == 0 && pcard2 >= 9) ||  (pcard2 == 0 && pcard1 >= 9)) {
         betwin = itr_bjpool->bet * 2.5;
         newbjstat = 1;
+
+        dcards = itr_bjpool->dcards | (darrnew[0] << 8);
+        dcnt = 2;
     } else if (pcard1 == pcard2) {
         // TODO: support splittable
         //newbjstat = 5;
@@ -1539,6 +1546,9 @@ void pokergame1::drawcards5x(const name from, uint32_t externalsrc, string dump1
     uint64_t newcards[5];
     string newcardsstr[5];
 
+    // jackpot
+    uint32_t isjackpot = 0;
+
     // 5 card sets
     for (int i = 0; i < 5; i++) {
         myset.clear();
@@ -1586,6 +1596,12 @@ void pokergame1::drawcards5x(const name from, uint32_t externalsrc, string dump1
         ebetwin[i] = eachbet * ratios[type];
         tbetwin += ebetwin[i];
         tresult = tresult + " X" + to_string(ratios[type]);
+
+
+        //jackpot
+        if (type == 9) {
+            isjackpot = 1;
+        }
 
         // records events if wintype >= straight
         if (type >= 4) {
@@ -1653,6 +1669,39 @@ void pokergame1::drawcards5x(const name from, uint32_t externalsrc, string dump1
             p.betwin4 = ebetwin[3];
             p.betwin5 = ebetwin[4];
         });
+    }
+
+    //jackpot
+    if (isjackpot == 1) {
+        auto itr_pevent = pevents.find(0);
+        uint64_t tempam = 0;
+        if (itr_pool->bet >= 250000) {
+            tempam = itr_pevent->eosin * 0.9;
+            puevents.emplace(_self, [&](auto &p) {
+                p.id = events.available_primary_key();
+                p.owner = from;
+                p.type = 1;
+            });
+        } else if (itr_pool->bet >= 50000 && itr_pool->bet < 250000) {
+            tempam = itr_pevent->eosin * 0.18;
+            puevents.emplace(_self, [&](auto &p) {
+                p.id = events.available_primary_key();
+                p.owner = from;
+                p.type = 2;
+            });
+        } else if (itr_pool->bet >= 12500 && itr_pool->bet < 50000) {
+            tempam = itr_pevent->eosin * 0.045;
+            puevents.emplace(_self, [&](auto &p) {
+                p.id = events.available_primary_key();
+                p.owner = from;
+                p.type = 3;
+            });
+        }
+
+        pevents.modify(itr_pevent, _self, [&](auto &p) {
+            p.eosin = p.eosin - tempam;
+        });
+        tbetwin += tempam;
     }
 
     uint64_t mineprice = getminingtableprice(itr_metadata->teosin);
@@ -1761,8 +1810,43 @@ void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, 
     uint32_t type = checkwin((uint32_t)itr_user->card1, (uint32_t)itr_user->card2, (uint32_t)itr_user->card3,
             (uint32_t)itr_user->card4, (uint32_t)itr_user->card5);
     uint32_t finalratio = ratios[type];
+
+    //jackpot
+    uint64_t tempam = 0;
+    if (type == 9) {
+        auto itr_pevent = pevents.find(0);
+
+        if (itr_user->bet >= 50000) {
+            tempam = itr_pevent->eosin * 0.9;
+            puevents.emplace(_self, [&](auto &p) {
+                p.id = events.available_primary_key();
+                p.owner = from;
+                p.type = tempam;
+            });
+        } else if (itr_user->bet >= 10000 && itr_user->bet < 50000) {
+            tempam = itr_pevent->eosin * 0.18;
+            puevents.emplace(_self, [&](auto &p) {
+                p.id = events.available_primary_key();
+                p.owner = from;
+                p.type = tempam;
+            });
+        } else if (itr_user->bet >= 2500 && itr_user->bet < 10000) {
+            tempam = itr_pevent->eosin * 0.045;
+            puevents.emplace(_self, [&](auto &p) {
+                p.id = events.available_primary_key();
+                p.owner = from;
+                p.type = tempam;
+            });
+        }
+
+        pevents.modify(itr_pevent, _self, [&](auto &p) {
+            p.eosin = p.eosin - tempam;
+        });
+    }
+
+
     pools.modify(itr_user, _self, [&](auto &p){
-        uint64_t b = p.bet * finalratio;
+        uint64_t b = p.bet * finalratio + tempam;   //jackpot
         p.betwin = b;
         p.wintype = type;
     });
@@ -1956,12 +2040,23 @@ void pokergame1::clear() {
         itr9 = paccounts.erase(itr9);
     }
 
-*/
+
     auto itr10 = bjpools.begin();
     while (itr10 != bjpools.end()) {
         itr10 = bjpools.erase(itr10);
         print("");
     }
+*/
+    auto itr10 = pevents.begin();
+    while (itr10 != pevents.end()) {
+        itr10 = pevents.erase(itr10);
+    }
+
+    pevents.emplace(_self, [&](auto &p) {
+        p.id = 0;
+        p.count = 0;
+        p.eosin = 0;
+    });
 }
 
 
