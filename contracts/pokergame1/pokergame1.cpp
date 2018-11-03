@@ -13,8 +13,10 @@ uint64_t miningtable[5][2] = {{400000000000, 400}, // 1EOS 4MEV
 uint64_t exptable[15] = {500000, 3000000, 9000000, 21000000, 61000000, 208500000, 654500000, 1783000000, 4279500000,
                          9269500000, 18490500000, 34500000000, 60922000000, 102736000000, 166608500000};
 
-
 uint32_t bjvalues[13] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10};
+
+// experience multiplier by game
+uint32_t expbygame[3] = {50, 50, 25};
 
 // check if the player wins or not
 uint32_t ratios[10] = {0, 1, 2, 3, 4, 5, 8, 25, 50, 250};
@@ -23,8 +25,7 @@ const uint32_t wstarttime = 1537747200; //GMT: Monday, September 24, 2018 12:00:
 uint64_t mstarttimes[5] = {1535760000, 1538352000, 1541030400, 1543622400, 1546300800};
 const char hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
 
-uint32_t getlevel(uint64_t teosin) {
-    uint64_t totalexp = teosin * 50;
+uint32_t getlevel(uint64_t totalexp) {
     for (int i = 0; i < 15; i++) {
         if (totalexp < exptable[i]) {
             return i;
@@ -97,9 +98,12 @@ checksum256 pokergame1::gethash(account_name from, uint32_t externalsrc, uint32_
     uint64_t round64 = ((uint64_t)rounds) << 32;
     bias = bias + src64 + round64;
 
+    // TODO: do we need to sync with chain?
+    /*
     if (rounds % 4096 == 0) {
         bias += current_time() + tapos_block_num();
     }
+     */
 
     uint64_t lastidx = itr_metadata->idx == 0 ? 1023 : itr_metadata->idx - 1;
     auto itr_last = secrets.find(lastidx);
@@ -239,6 +243,7 @@ void pokergame1::depositg1(const currency::transfer &t, uint32_t gameid, uint32_
         arr[1] = (arr[3] + 5 * mm) % 52;
     }
 */
+
     auto itr_user1 = pools.find(user);
     pools.modify(itr_user1, _self, [&](auto &p){
         p.status = gameid;
@@ -255,39 +260,6 @@ void pokergame1::depositg1(const currency::transfer &t, uint32_t gameid, uint32_
         p.wintype = 0;
     });
 
-    auto itr_paccount = paccounts.find(user);
-    uint32_t nextlev = 0;
-    uint32_t prevlev = itr_paccount->level;
-    if (itr_paccount == paccounts.end()) {
-        nextlev = getlevel(amount);
-        paccounts.emplace(_self, [&](auto &p){
-            p.owner = name{user};
-            p.level = nextlev;
-            p.exp = amount * 50;
-        });
-    } else {
-        uint64_t userteosin = 0;
-        auto itr_gacnt = gaccounts.find(user);
-        if (itr_gacnt != gaccounts.end()) {
-            userteosin = itr_gacnt->teosin;
-        }
-
-        nextlev = getlevel(userteosin + amount);
-        paccounts.modify(itr_paccount, _self, [&](auto &p) {
-            p.level = nextlev;
-            p.exp += amount * 50;
-        });
-    }
-    // send new level 1 user 50 mev
-    if (prevlev == 0 && nextlev == 1) {
-        asset ballev1 = asset(500000, symbol_type(S(4, MEV)));
-        action(permission_level{_self, N(active)}, N(eosvegascoin),
-               N(transfer), std::make_tuple(N(eosvegasjack), user, ballev1,
-                                            std::string("Congratulations on your level 1! Please enjoy the game! - jacks.MyEosVegas.com")))
-                .send();
-    }
-
-
     // jackpot
     auto itr_pevent = pevents.find(0);
     pevents.modify(itr_pevent, _self, [&](auto &p) {
@@ -295,7 +267,6 @@ void pokergame1::depositg1(const currency::transfer &t, uint32_t gameid, uint32_
         p.eosin += tempam;
     });
 }
-
 
 
 /********************* Blackjack *****************************/
@@ -587,10 +558,10 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t gameid, uint32_
     }
     eosio_assert(gameaction == 1 || gameaction == 2 || gameaction == 3, "Blackjack: wrong action");
     // set bet cap here
-    if (gameaction == 1) {
-        eosio_assert(amount >= 1000, "Blackjack: bet under minimum threshold!");
-        eosio_assert(amount <= 100000, "Blackjack: bet exceeds bet cap!");
-    }
+    //if (gameaction == 1) {
+    //    eosio_assert(amount >= 1000, "Blackjack: bet under minimum threshold!");
+    //    eosio_assert(amount <= 100000, "Blackjack: bet exceeds bet cap!");
+    //}
 
     //find user
     auto itr_bjpool = bjpools.find(user);
@@ -820,28 +791,6 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t gameid, uint32_
                 p.betwin = betwin;
             });
         }
-    }
-
-    auto itr_paccount = paccounts.find(user);
-    if (itr_paccount == paccounts.end()) {
-        paccounts.emplace(_self, [&](auto &p){
-            p.owner = name{user};
-            uint32_t nextlev = getlevel(amount);
-            p.level = nextlev;
-            p.exp = amount * 50;
-        });
-    } else {
-        uint64_t userteosin = 0;
-        auto itr_gacnt = gaccounts.find(user);
-        if (itr_gacnt != gaccounts.end()) {
-            userteosin = itr_gacnt->teosin;
-        }
-
-        paccounts.modify(itr_paccount, _self, [&](auto &p) {
-            uint32_t nextlev = getlevel(userteosin + amount);
-            p.level = nextlev;
-            p.exp += amount * 50;
-        });
     }
 }
 
@@ -1101,6 +1050,36 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         eosio_assert(user == N(blockfishbgp), "Blackjack under testing");
 
         depositg2(t, gameid, itr_metadata->trounds);
+    }
+
+    auto itr_paccount = paccounts.find(user);
+    uint32_t nextlev = 0;
+    uint32_t prevlev = itr_paccount->level;
+    uint64_t amount = t.quantity.amount;
+    if (itr_paccount == paccounts.end()) {
+        uint64_t newexp = amount * expbygame[gameid];
+        nextlev = getlevel(newexp);
+        paccounts.emplace(_self, [&](auto &p){
+            p.owner = name{user};
+            p.level = nextlev;
+            p.exp = newexp;
+        });
+    } else {
+        uint64_t newexp = itr_paccount->exp + amount * expbygame[gameid];
+
+        nextlev = getlevel(newexp);
+        paccounts.modify(itr_paccount, _self, [&](auto &p) {
+            p.level = nextlev;
+            p.exp = newexp;
+        });
+    }
+    // send new level 1 user 50 mev
+    if (prevlev == 0 && nextlev == 1) {
+        asset ballev1 = asset(500000, symbol_type(S(4, MEV)));
+        action(permission_level{_self, N(active)}, N(eosvegascoin),
+               N(transfer), std::make_tuple(N(eosvegasjack), user, ballev1,
+                                            std::string("Congratulations on your level 1! Please enjoy the game! - jacks.MyEosVegas.com")))
+                .send();
     }
 }
 
@@ -2040,13 +2019,13 @@ void pokergame1::clear() {
         itr9 = paccounts.erase(itr9);
     }
 
-
+*/
     auto itr10 = bjpools.begin();
     while (itr10 != bjpools.end()) {
         itr10 = bjpools.erase(itr10);
         print("");
     }
-*/
+/*
     auto itr10 = pevents.begin();
     while (itr10 != pevents.end()) {
         itr10 = pevents.erase(itr10);
@@ -2057,6 +2036,7 @@ void pokergame1::clear() {
         p.count = 0;
         p.eosin = 0;
     });
+    */
 }
 
 
