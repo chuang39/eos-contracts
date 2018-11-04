@@ -1045,7 +1045,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         }
         // eosio_assert(gameid == 2, "Blackjack only");
 
-        eosio_assert(user == N(blockfishbgp), "Blackjack under testing");
+        eosio_assert(user == N(blockfishbgp) || user == N(duanbin12345), "Blackjack under testing");
 
         depositg2(t, gameid, itr_metadata2->trounds);
     }
