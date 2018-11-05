@@ -54,7 +54,8 @@ public:
              blacklists(_self, _self),
              bjpools(_self, _self),
              pevents(_self, _self),
-             puevents(_self, _self){};
+             puevents(_self, _self),
+             bjwins(_self, _self){};
 
     //@abi action
     void dealreceipt(const name from, string game, string hash1, string hash2, string cards, string result, string betineos, string winineos);
@@ -104,7 +105,9 @@ public:
     void bjuninsure(const account_name from, uint32_t externalsrc);
     //@abi action
     void bjreceipt(string game_id, const name from, string game, string hash, std::vector<uint32_t> dealer_hand,
-                   std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2, string bet, string win);
+                   std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2, string bet, string win,
+                   string insure_bet, string insure_win, std::vector<string> dealer_cards, std::vector<string> player_cards1,
+                   std::vector<string> player_cards2);
 
 
     checksum256 gethash(account_name from, uint32_t externalsrc, uint32_t rounds);
@@ -116,7 +119,7 @@ public:
     bool ishold(string s);
     bool checkBiggerJack(uint32_t numbers[5]);
     uint32_t parsecard(string s);
-    void report(name from, uint64_t minemev, uint64_t meosin, uint64_t meosout);
+    void report(name from, uint64_t minemev, uint64_t meosin, uint64_t meosout, uint32_t gameid);
     uint32_t checkwin(uint32_t c1, uint32_t c2, uint32_t c3, uint32_t c4, uint32_t c5);
 
     uint32_t checkace(uint32_t numbers[5]);
@@ -211,6 +214,20 @@ private:
         uint64_t primary_key() const { return owner; }
 
         EOSLIB_SERIALIZE(st_bjpools, (owner)(status)(dcards)(dcnt)(pcards1)(pcnt1)(pcards2)(pcnt2)(wintype)(betcurrency)(bet)(betwin)(insurance)(insurancewin)(userseed)(cardhash))
+    };
+
+
+
+    // @abi table bjwins i64
+    struct st_bjwins {
+        uint64_t id;
+        name owner;
+        uint32_t datetime;
+        uint32_t win;
+
+        uint64_t primary_key() const { return id; }
+
+        EOSLIB_SERIALIZE(st_bjwins, (id)(owner)(datetime)(win))
     };
 
 
@@ -393,6 +410,8 @@ private:
 
     typedef multi_index<N(bjpools), st_bjpools> _tb_bjpools;
     _tb_bjpools bjpools;
+    typedef multi_index<N(bjwins), st_bjwins> _tb_bjwins;
+    _tb_bjwins bjwins;
 
 
     typedef multi_index<N(pevents), st_pevents> _tb_pevents;

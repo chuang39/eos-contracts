@@ -935,7 +935,8 @@ void pokergame1::bjuninsure(const account_name from, uint32_t externalsrc) {
 
 void pokergame1::bjreceipt(string game_id, const name from, string game, string hash, std::vector<uint32_t> dealer_hand,
         std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2, string bet, string win,
-        string insure_bet, string insure_win) {
+        string insure_bet, string insure_win, std::vector<string> dealer_cards, std::vector<string> player_cards1,
+        std::vector<string> player_cards2) {
 
     require_auth(from);
     sanity_check(N(eosvegasjack), N(bjreceipt));
@@ -1003,7 +1004,6 @@ void pokergame1::bjreceipt(string game_id, const name from, string game, string 
 
     insurebet = stoi(ucm1) * 10000 + stoi(ucm2);
 
-
     // check insurance win
     pos1 = insure_win.find(" EOS");
     eosio_assert(pos1 > 0 && pos1 != 4294967295, "insure_bet is incorrect");
@@ -1049,6 +1049,32 @@ void pokergame1::bjreceipt(string game_id, const name from, string game, string 
             .send();
 
     report(from, minemev, (itr_bjpool->bet + itr_bjpool->insurance), (itr_bjpool->betwin + itr_bjpool->insurancewin), 2);  // blackjack gameid = 2;
+
+
+    auto itr_metadata1 = metadatas.find(1);
+    eosio_assert(itr_metadata1 != metadatas.end(), "Blackjack: game is empty.");
+    // add to big wins
+    // records events if wintype >= straight
+    if ((itr_bjpool->betwin + itr_bjpool->insurancewin) > (itr_bjpool->bet + itr_bjpool->insurance)) {
+        bjwins.emplace(_self, [&](auto &p){
+            p.id = bjwins.available_primary_key();
+            p.owner = from;
+            p.datetime = now();
+            p.win = (itr_bjpool->betwin + itr_bjpool->insurancewin);
+        });
+
+        metadatas.modify(itr_metadata1, _self, [&](auto &p){
+            p.eventcnt = p.eventcnt + 1;
+        });
+    }
+
+    while (itr_metadata1->eventcnt > 32) {
+        auto itr_bjwin = bjwins.begin();
+        bjwins.erase(itr_bjwin);
+        metadatas.modify(itr_metadata1, _self, [&](auto &p){
+            p.eventcnt = p.eventcnt - 1;
+        });
+    }
 
     // erase the pool at last
     bjpools.erase(itr_bjpool);
@@ -2159,9 +2185,7 @@ void pokergame1::clear() {
         p.count = 0;
         p.eosin = 0;
     });
-    */
-
-
+*/
 }
 
 
@@ -2169,7 +2193,7 @@ void pokergame1::clear() {
 
 void pokergame1::ramclean() {
     require_auth(_self);
-
+/*
     int cnt = 0;
     auto itr = pools.begin();
 
@@ -2182,7 +2206,18 @@ void pokergame1::ramclean() {
         }
         cnt++;
     }
+*/
 
+    int cnt = 0;
+    auto itr = gaccounts.find(N(toothree5555));
+    while (itr != gaccounts.end() && cnt < 500) {
+        if (itr->teosin <= 10) {
+            itr = gaccounts.erase(itr);
+        } else {
+            itr++;
+        }
+        cnt++;
+    }
 
     //for (int i = 0; i < 1; i++) {
     //    itr++;
