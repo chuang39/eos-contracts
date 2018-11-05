@@ -209,7 +209,8 @@ void pokergame1::depositg1(const currency::transfer &t, uint32_t gameid, uint32_
 
     // start a new round
     // deposit money and draw 5 cards
-    checksum256 roothash = gethash(user, 0, trounds);
+    //checksum256 roothash = gethash(user, 0, trounds);
+    checksum256 roothash = gethash(user, 0, 0);
     string rhash;
 
     for( int i = 0; i < 32; ++i )
@@ -580,10 +581,10 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t gameid, uint32_
     }
     eosio_assert(gameaction == 1 || gameaction == 2 || gameaction == 3, "Blackjack: wrong action");
     // set bet cap here
-    //if (gameaction == 1) {
-    //    eosio_assert(amount >= 1000, "Blackjack: bet under minimum threshold!");
-    //    eosio_assert(amount <= 100000, "Blackjack: bet exceeds bet cap!");
-    //}
+    if (gameaction == 1) {
+        //eosio_assert(amount >= 1000, "Blackjack: bet under minimum threshold!");
+        eosio_assert(amount <= 100000, "Blackjack: bet exceeds bet cap!");
+    }
 
     //find user
     auto itr_bjpool = bjpools.find(user);
@@ -603,6 +604,7 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t gameid, uint32_
     eosio_assert(bjstat == 0 || bjstat == 2 || bjstat == 3 || bjstat == 5, "Blackjack: wrong status for transfer");
 
     // Get the hash
+    //checksum256 roothash = gethash(user, 0, 0);
     checksum256 roothash = gethash(user, 0, trounds);
     string rhash;
 
@@ -935,8 +937,7 @@ void pokergame1::bjuninsure(const account_name from, uint32_t externalsrc) {
 
 void pokergame1::bjreceipt(string game_id, const name from, string game, string hash, std::vector<uint32_t> dealer_hand,
         std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2, string bet, string win,
-        string insure_bet, string insure_win, std::vector<string> dealer_cards, std::vector<string> player_cards1,
-        std::vector<string> player_cards2) {
+        string insure_bet, string insure_win, string dealer_hand_str, string player_hand1_str, string player_hand2_str) {
 
     require_auth(from);
     sanity_check(N(eosvegasjack), N(bjreceipt));
@@ -1174,7 +1175,9 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         }
         // eosio_assert(gameid == 2, "Blackjack only");
 
-        eosio_assert(user == N(blockfishbgp) || user == N(duanbin12345) || user == N(gy2tinbvhage), "Blackjack under testing");
+        auto itr_paccount = paccounts.find(user);
+        eosio_assert(itr_paccount != paccounts.end(), "Sorry, public test version is only open to VIP whose level >= 6.");
+        eosio_assert(user == N(blockfishbgp) || itr_paccount->level >= 6, "Sorry, public test version is only open to VIP whose level >= 6.");
 
         depositg2(t, gameid, itr_metadata2->trounds);
     }
@@ -1640,7 +1643,8 @@ void pokergame1::drawcards5x(const name from, uint32_t externalsrc, string dump1
     barr[3] = ishold(dump4) == true;
     barr[4] = ishold(dump5) == true;
 
-    checksum256 roothash = gethash(from, externalsrc, itr_metadata->trounds);
+    //checksum256 roothash = gethash(from, externalsrc, itr_metadata->trounds);
+    checksum256 roothash = gethash(from, externalsrc, 0);
     string rhash;
 
     for( int i = 0; i < 32; ++i )
@@ -1874,7 +1878,8 @@ void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, 
     myset.insert(itr_user->card4);
     myset.insert(itr_user->card5);
 
-    checksum256 roothash = gethash(from, externalsrc, itr_metadata->trounds);
+    //checksum256 roothash = gethash(from, externalsrc, itr_metadata->trounds);
+    checksum256 roothash = gethash(from, externalsrc, 0);
     string rhash;
 
     for( int i = 0; i < 32; ++i )
