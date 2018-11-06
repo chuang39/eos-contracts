@@ -227,7 +227,8 @@ void pokergame1::depositg1(const currency::transfer &t, uint32_t gameid, uint32_
     uint32_t arr1[5];
     getcards(user, roothash, arr1, 5, myset, amount, 52);
     arr = arr1;
-/*
+
+    /*
     if (user == N(gy2tinbvhage) && amount >= 100000) {
         uint32_t mm = roothash.hash[0] % 3 + 1;
         arr[3] = (arr[0] + 13) % 52;
@@ -235,7 +236,7 @@ void pokergame1::depositg1(const currency::transfer &t, uint32_t gameid, uint32_
         arr[2] = (arr[3] + 1) % 52;
         arr[1] = (arr[3] + 5 * mm) % 52;
     }
-*/
+    */
 
     auto itr_user1 = pools.find(user);
     pools.modify(itr_user1, _self, [&](auto &p){
@@ -1149,6 +1150,8 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
                 p.bet = 0;
                 p.betwin = 0;
             });
+        } else {
+            eosio_assert(itr_user->bet == 0 && itr_user->betwin == 0, "Receipt of previous hand is not issued. Please contact us for help.");
         }
 
         depositg1(t, gameid, itr_metadata2->trounds, bettype);
@@ -1458,11 +1461,11 @@ void pokergame1::dealreceipt(const name from, string game, string hash1, string 
 
 }
 
-void pokergame1::receipt5x(const name from, string game, string hash1, string hash2, string cards1, string cards2, string cards3, string cards4, string cards5, string results, string betineos, string winineos) {
+void pokergame1::receipt5x(const name from, string game, string hash1, string hash2, string cards1, string cards2,
+        string cards3, string cards4, string cards5, string results, string betineos, string winineos) {
     require_auth(from);
     require_recipient(from);
     sanity_check(N(eosvegasjack), N(receipt5x));
-
 
     auto itr_pool = pools.find(from);
     auto itr_pool5x = pool5xs.find(from);
@@ -1806,21 +1809,21 @@ void pokergame1::drawcards5x(const name from, uint32_t externalsrc, string dump1
         if (itr_pool->bet >= 250000) {
             tempam = itr_pevent->eosin * 0.9;
             puevents.emplace(_self, [&](auto &p) {
-                p.id = events.available_primary_key();
+                p.id = puevents.available_primary_key();
                 p.owner = from;
                 p.type = 1;
             });
         } else if (itr_pool->bet >= 50000 && itr_pool->bet < 250000) {
             tempam = itr_pevent->eosin * 0.18;
             puevents.emplace(_self, [&](auto &p) {
-                p.id = events.available_primary_key();
+                p.id = puevents.available_primary_key();
                 p.owner = from;
                 p.type = 2;
             });
         } else if (itr_pool->bet >= 12500 && itr_pool->bet < 50000) {
             tempam = itr_pevent->eosin * 0.045;
             puevents.emplace(_self, [&](auto &p) {
-                p.id = events.available_primary_key();
+                p.id = puevents.available_primary_key();
                 p.owner = from;
                 p.type = 3;
             });
@@ -2176,7 +2179,7 @@ void pokergame1::clear() {
     auto itr10 = bjpools.begin();
     while (itr10 != bjpools.end()) {
         itr10 = bjpools.erase(itr10);
-        print("");
+        print("===");
     }
 
 /*
@@ -2381,6 +2384,22 @@ void pokergame1::setminingon(uint64_t id, uint32_t flag) {
 
 void pokergame1::setseed(const name from, uint32_t seed) {
     require_auth(_self);
+
+/*
+    uint32_t darr[3];
+    darr[0] = 3;
+    darr[1] = 162;
+    darr[2] = 187;
+    uint32_t dresult = bj_get_result(darr, 3);
+
+    uint32_t parr[2];
+    parr[0] = 141;
+    parr[1] = 108;
+    uint32_t presult = bj_get_result(parr, 2);
+
+    print("=====", dresult);
+    print("=====", presult);
+*/
     //require_auth2(from, N(eosio.code));
 /*
     auto itr = finaltable.begin();
