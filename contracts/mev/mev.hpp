@@ -107,6 +107,27 @@ class mev : public contract {
      void add_balance( account_name owner, asset value, account_name ram_payer );
 
 
+    //@abi table dividends i64
+    struct st_dividends {
+        account_name owner;
+        uint64_t mevamount;
+        uint64_t eosamount;
+
+        uint64_t primary_key()const { return owner; }
+        EOSLIB_SERIALIZE(st_dividends, (owner)(mevamount)(eosamount))
+    };
+
+    //@abi table buybacks i64
+    struct st_buybacks {
+        account_name owner;
+        uint64_t mevamount;
+        uint64_t eosamount;
+
+        uint64_t primary_key()const { return owner; }
+        EOSLIB_SERIALIZE(st_buybacks, (owner)(mevamount)(eosamount))
+    };
+
+
   public:
      struct transfer_args {
         account_name  from;

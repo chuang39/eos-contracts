@@ -144,7 +144,7 @@ void mev::debug(account_name from) {
 
     stake_summary_index stakes(N(eosvegasdivi), N(eosvegasdivi));
     auto itr_stake = stakes.find(from);
-    eosio_assert( itr_stake->stake.amount == 7273, "overdrawn balance due to stake");
+    eosio_assert( itr_stake->stake.amount == 7273, "overdrawn balance due to stake ");
 
 }
 
