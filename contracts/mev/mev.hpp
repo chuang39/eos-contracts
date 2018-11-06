@@ -114,6 +114,13 @@ class mev : public contract {
         asset         quantity;
         string        memo;
      };
+
+    struct st_stake_summary {
+        name owner;
+        asset stake;
+        uint64_t primary_key() const { return owner; }
+    };
+    typedef multi_index<N(stakesummary), st_stake_summary> stake_summary_index;
 };
 
 asset mev::get_supply( symbol_name sym )const

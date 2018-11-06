@@ -96,6 +96,13 @@ void mev::sub_balance( account_name owner, asset value ) {
    const auto& from = from_acnts.get( value.symbol.name(), "no balance object found" );
    eosio_assert( from.balance.amount >= value.amount, "overdrawn balance!" );
 
+   stake_summary_index stakes(N(eosvegasdivi), N(eosvegasdivi));
+   auto itr_stake = stakes.find(owner);
+   if (itr_stake != stakes.end()) {
+       uint64_t stakenum = 0;
+       eosio_assert( (from.balance.amount - itr_stake->stake.amount) >= value.amount, "overdrawn balance due to stake");
+   }
+
    if( from.balance.amount == value.amount ) {
       from_acnts.erase( from );
       auto itr_holder = holders.find(owner);
@@ -134,15 +141,11 @@ void mev::add_balance( account_name owner, asset value, account_name ram_payer )
 
 void mev::debug(account_name from) {
     require_auth( _self );
-    accounts from_acnts( _self, from );
 
-    asset bal = asset(0, symbol_type(S(4, MEV)));
-    const auto& itr_user = from_acnts.get( bal.symbol.name(), "no balance object found" );
+    stake_summary_index stakes(N(eosvegasdivi), N(eosvegasdivi));
+    auto itr_stake = stakes.find(from);
+    eosio_assert( itr_stake->stake.amount == 7273, "overdrawn balance due to stake");
 
-    from_acnts.erase( itr_user );
-
-    int32_t ram_bytes = action_data_size();
-    print("======",ram_bytes);
 }
 
 void mev::registerbb(account_name from, asset quantity) {
