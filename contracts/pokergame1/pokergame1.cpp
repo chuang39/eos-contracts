@@ -83,6 +83,44 @@ void sanity_check(uint64_t code, action_name act) {
 }
 
 checksum256 pokergame1::gethash(account_name from, uint32_t externalsrc, uint32_t rounds) {
+
+    auto itr_sec2 = secrets2.find(from);
+    if (itr_sec2 == secrets2.end()) {
+        uint32_t idx = from % 1024;
+
+        auto itr_secret = secrets.find(idx);
+        itr_sec2 = secrets2.emplace(_self, [&](auto &p){
+            p.owner = name{from};
+            p.s1 = itr_secret->s1;
+        });
+    }
+    //print("====secret:", itr_sec2->s1);
+    //print("=====swapped secret:", ((itr_sec2->s1 >> 16) | (itr_sec2->s1 << 48)));
+
+    uint64_t seed = ((itr_sec2->s1 >> 16) | (itr_sec2->s1 << 48)) + from * 7 + externalsrc * 3;
+
+    //print("====seed:", seed);
+    //print("-=====sizeof(seed):",sizeof(seed));
+
+    checksum256 result;
+    sha256((char *)&seed, sizeof(seed), &result);
+
+    uint64_t bias = 0;
+    for (int i = 0; i < 8; i++) {
+        bias |= result.hash[7 - i];
+        bias <<= 8;
+    }
+
+    uint64_t src64 = ((uint64_t)externalsrc) << 2;
+    //uint64_t round64 = ((uint64_t)rounds) << 32;
+    bias = bias + src64;
+
+    secrets2.modify(itr_sec2, _self, [&](auto &p){
+        p.s1 = bias;
+    });
+
+    return result;
+    /*
     auto itr_metadata = metadatas.find(0);
     auto itr_secret = secrets.find(itr_metadata->idx);
     uint64_t seed = itr_secret->s1 + from * 7 + externalsrc * 3;
@@ -101,11 +139,9 @@ checksum256 pokergame1::gethash(account_name from, uint32_t externalsrc, uint32_
     bias = bias + src64 + round64;
 
     // TODO: do we need to sync with chain?
-    /*
-    if (rounds % 4096 == 0) {
-        bias += current_time() + tapos_block_num();
-    }
-     */
+    //if (rounds % 4096 == 0) {
+    //    bias += current_time() + tapos_block_num();
+    //}
 
     uint64_t lastidx = itr_metadata->idx == 0 ? 1023 : itr_metadata->idx - 1;
     auto itr_last = secrets.find(lastidx);
@@ -117,6 +153,7 @@ checksum256 pokergame1::gethash(account_name from, uint32_t externalsrc, uint32_
     });
 
     return result;
+     */
 }
 
 void pokergame1::getcards(account_name from, checksum256 result, uint32_t* cards, uint32_t length, std::set<uint32_t> myset, uint64_t hack, uint32_t maxcard) {
@@ -545,6 +582,8 @@ void pokergame1::bjhit(const name from, string hash, std::vector<uint32_t> deale
 
             if (dresult != 21) {
                 betwin = itr_bjpool->bet * 2;
+            } else {
+                betwin = itr_bjpool->bet;
             }
             bjstat = 1;
             dcnt = dindex;
