@@ -44,6 +44,7 @@ public:
              events(_self, _self),
              metadatas(_self, _self),
              secrets(_self, _self),
+             secrets2(_self, _self),
              ginfos(_self, _self),
              gaccounts(_self, _self),
              cardstats(_self, _self),
@@ -55,7 +56,9 @@ public:
              bjpools(_self, _self),
              pevents(_self, _self),
              puevents(_self, _self),
-             bjwins(_self, _self){};
+             bjwins(_self, _self),
+             partners(_self, _self),
+             referrals(_self, _self){};
 
     //@abi action
     void dealreceipt(const name from, string game, string hash1, string hash2, string cards, string result, string betineos, string winineos);
@@ -106,8 +109,7 @@ public:
     //@abi action
     void bjreceipt(string game_id, const name from, string game, string hash, std::vector<uint32_t> dealer_hand,
                    std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2, string bet, string win,
-                   string insure_bet, string insure_win, std::vector<string> dealer_cards, std::vector<string> player_cards1,
-                   std::vector<string> player_cards2);
+                   string insure_bet, string insure_win, string dealer_hand_str, string player_hand1_str, string player_hand2_str);
 
 
     checksum256 gethash(account_name from, uint32_t externalsrc, uint32_t rounds);
@@ -291,6 +293,13 @@ private:
         EOSLIB_SERIALIZE(st_secrets, (id)(s1))
     };
 
+    struct st_secrets2 {
+        name owner;
+        uint64_t s1;
+        uint64_t primary_key() const { return owner; }
+        EOSLIB_SERIALIZE(st_secrets2, (owner)(s1))
+    };
+
     // @abi table ginfos i64
     struct st_ginfos {
         uint32_t startmonth;
@@ -357,10 +366,10 @@ private:
     };
 
 
-    // @abi table pevents i64
+    // @abi table puevents i64
     struct st_puevents {
         uint64_t id;
-        uint64_t owner;
+        name owner;
         uint64_t type;
 
         uint64_t primary_key() const { return id; }
@@ -375,10 +384,27 @@ private:
         uint64_t primary_key() const { return owner; }
         EOSLIB_SERIALIZE(st_logbonus, (owner)(lastbonus))
     };
-
-
 */
 
+    // @abi table partners i64
+    struct st_partners {
+        name owner;
+        uint64_t rate;
+        uint64_t eosout;
+        uint64_t count;
+
+        uint64_t primary_key() const { return owner; }
+        EOSLIB_SERIALIZE(st_partners, (owner)(rate)(eosout)(count))
+    };
+
+    // @abi table referrals i64
+    struct st_referrals {
+        name owner;
+        name referrer;
+
+        uint64_t primary_key() const { return owner; }
+        EOSLIB_SERIALIZE(st_referrals, (owner)(referrer))
+    };
 
 
 
@@ -392,6 +418,8 @@ private:
     _tb_events events;
     typedef multi_index<N(secrets), st_secrets> _tb_secrets;
     _tb_secrets secrets;
+    typedef multi_index<N(secrets2), st_secrets2> _tb_secrets2;
+    _tb_secrets2 secrets2;
     typedef multi_index<N(ginfos), st_ginfos> _tb_ginfos;
     _tb_ginfos ginfos;
     typedef multi_index<N(gaccounts), st_gaccounts> _tb_gaccounts;
@@ -418,4 +446,10 @@ private:
     _tb_pevents pevents;
     typedef multi_index<N(puevents), st_puevents> _tb_puevents;
     _tb_puevents puevents;
+
+
+    typedef multi_index<N(partners), st_partners> _tb_partners;
+    _tb_partners partners;
+    typedef multi_index<N(referrals), st_referrals> _tb_referrals;
+    _tb_referrals referrals;
 };

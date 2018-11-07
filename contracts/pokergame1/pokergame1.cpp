@@ -1064,7 +1064,6 @@ void pokergame1::bjreceipt(string game_id, const name from, string game, string 
     eosio_assert(insurebet == itr_bjpool->insurance, "Blackjack: insurance doesn't match.");
     eosio_assert(insurewin == itr_bjpool->insurancewin, "Blackjack: insurance win doesn't match.");
 
-
     // pay bet win
     asset bal = asset((itr_bjpool->betwin + itr_bjpool->insurancewin), symbol_type(S(4, EOS)));
     if (bal.amount > 0) {
