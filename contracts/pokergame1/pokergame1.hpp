@@ -111,6 +111,8 @@ public:
                    std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2, string bet, string win,
                    string insure_bet, string insure_win, string dealer_hand_str, string player_hand1_str, string player_hand2_str);
 
+    //@abi action
+    void addpartner(const account_name partner, uint32_t rate);
 
     checksum256 gethash(account_name from, uint32_t externalsrc, uint32_t rounds);
     void getcards(account_name from, checksum256 result, uint32_t* cards, uint32_t num, std::set<uint32_t> myset, uint64_t hack, uint32_t maxcard);
@@ -389,7 +391,7 @@ private:
     // @abi table partners i64
     struct st_partners {
         name owner;
-        uint64_t rate;
+        uint32_t rate;
         uint64_t eosout;
         uint64_t count;
 

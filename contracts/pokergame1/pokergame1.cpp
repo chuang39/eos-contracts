@@ -15,6 +15,9 @@ uint64_t exptable[15] = {500000, 3000000, 9000000, 21000000, 61000000, 208500000
 
 uint32_t bjvalues[13] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10};
 
+// "IQ", "MEETONE", "BLACK", "BT", "EGT", "TPT", "ZKS", "KARMA"
+//string tokentable[1] = {"MEV"};
+
 // experience multiplier by game
 uint32_t expbygame[3] = {50, 50, 25};
 uint32_t minebygame[3] = {100, 100, 50};      // xN/100
@@ -1430,6 +1433,7 @@ void pokergame1::dealreceipt(const name from, string game, string hash1, string 
     eosio_assert(hash1 == itr_user->cardhash1, "cardhash1 is not valid");
     eosio_assert(hash2 == itr_user->cardhash2, "cardhash2 is not valid");
     eosio_assert(itr_user->bet > 0, "bet must be larger than zero");
+    eosio_assert(itr_user->status == 0, "Wrong game mode!");
 
     uint64_t betnum = 0;
     uint64_t winnum = 0;
@@ -1495,8 +1499,6 @@ void pokergame1::dealreceipt(const name from, string game, string hash1, string 
            N(transfer), std::make_tuple(N(eosvegasjack), from, bal2,
                                         std::string("Gaming deserves rewards! - jacks.MyEosVegas.com")))
             .send();
-
-
 }
 
 void pokergame1::receipt5x(const name from, string game, string hash1, string hash2, string cards1, string cards2,
@@ -1515,6 +1517,7 @@ void pokergame1::receipt5x(const name from, string game, string hash1, string ha
     eosio_assert(hash1 == itr_pool->cardhash1, "cardhash1 is not valid");
     eosio_assert(hash2 == itr_pool->cardhash2, "cardhash2 is not valid");
     eosio_assert(itr_pool->bet > 0, "bet must be larger than zero");
+    eosio_assert(itr_pool->status == 1, "Wrong game mode!");
 
     uint64_t betnum = 0;
     uint64_t winnum = 0;
@@ -1671,6 +1674,7 @@ void pokergame1::drawcards5x(const name from, uint32_t externalsrc, string dump1
     eosio_assert(parsecard(dump3) == itr_pool->card3, "card3 mismatch");
     eosio_assert(parsecard(dump4) == itr_pool->card4, "card4 mismatch");
     eosio_assert(parsecard(dump5) == itr_pool->card5, "card5 mismatch");
+    eosio_assert(itr_pool->status == 1, "Wrong game mode!");
 
     auto itr_metadata = metadatas.find(2);
     auto itr_paccount = paccounts.find(from);
@@ -1908,6 +1912,7 @@ void pokergame1::drawcards(const name from, uint32_t externalsrc, string dump1, 
     eosio_assert(parsecard(dump3) == itr_user->card3, "card3 mismatch");
     eosio_assert(parsecard(dump4) == itr_user->card4, "card4 mismatch");
     eosio_assert(parsecard(dump5) == itr_user->card5, "card5 mismatch");
+    eosio_assert(itr_user->status == 0, "Wrong game mode!");
 
     auto itr_metadata = metadatas.find(2);
     auto itr_paccount = paccounts.find(from);
@@ -2161,6 +2166,27 @@ uint32_t pokergame1::parsecard(string s) {
     }
     return 1024;
 }
+
+
+void pokergame1::addpartner(const account_name partner, uint32_t rate) {
+    require_auth(N(eosvegasopmk));
+
+    eosio_assert(rate <= 50, "Rate cannot be more than 0.5%!");
+
+    auto itr = partners.find(partner);
+    if (itr == partners.end()) {
+        partners.emplace(_self, [&](auto &p) {
+            p.owner = name{partner};
+            p.rate = rate;
+            p.count = 0;
+            p.eosout = 0;
+        });
+    } else {
+        partners.modify(itr, _self, [&](auto &p) {
+            p.rate = rate;
+        });
+    }
+};
 
 void pokergame1::clear() {
 
@@ -2584,4 +2610,4 @@ extern "C" { \
 
 //EOSIO_ABI_EX(pokergame1, (dealreceipt)(drawcards)(clear)(setseed)(setcards)(init)(setgameon)(setminingon)(signup))
 //EOSIO_ABI_EX(pokergame1, (dealreceipt)(receipt5x)(drawcards)(drawcards5x)(clear)(setseed)(init)(setgameon)(setminingon)(signup)(getbonus))
-EOSIO_ABI_EX(pokergame1, (dealreceipt)(receipt5x)(drawcards)(drawcards5x)(setseed)(setgameon)(setminingon)(signup)(getbonus)(myeosvegas)(ramclean)(blacklist)(init)(clear)(bjstand)(bjhit)(bjuninsure)(bjreceipt))
+EOSIO_ABI_EX(pokergame1, (dealreceipt)(receipt5x)(drawcards)(drawcards5x)(setseed)(setgameon)(setminingon)(signup)(getbonus)(myeosvegas)(ramclean)(blacklist)(init)(clear)(bjstand)(bjhit)(bjuninsure)(bjreceipt)(addpartner))
