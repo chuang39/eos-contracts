@@ -1067,6 +1067,9 @@ void pokergame1::bjreceipt(string game_id, const name from, string game, string 
     eosio_assert(insurebet == itr_bjpool->insurance, "Blackjack: insurance doesn't match.");
     eosio_assert(insurewin == itr_bjpool->insurancewin, "Blackjack: insurance win doesn't match.");
 
+    // pay referral
+    payref(from, (itr_bjpool->bet + itr_bjpool->insurance), 1);
+
     // pay bet win
     asset bal = asset((itr_bjpool->betwin + itr_bjpool->insurancewin), symbol_type(S(4, EOS)));
     if (bal.amount > 0) {
@@ -1123,6 +1126,58 @@ void pokergame1::bjreceipt(string game_id, const name from, string game, string 
     bjpools.erase(itr_bjpool);
 }
 
+
+void pokergame1::payref(name from, uint64_t bet, uint32_t defaultrate) {
+    if (bet == 0) return;
+
+    auto itr_ref = referrals.find(from);
+    if (itr_ref == referrals.end()) return;
+    if (from == N(eosvegasjack)) {
+        referrals.erase(itr_ref);
+        return;
+    }
+
+    uint64_t rate = defaultrate;
+    auto itr_partner = partners.find(itr_ref->referrer);
+    if (itr_partner != partners.end()) {
+        rate = itr_partner->rate;
+    }
+    uint64_t pay = (bet * rate) / 10000;
+    if (pay == 0) {
+        referrals.erase(itr_ref);
+        return;
+    }
+
+    if (itr_partner == partners.end()) {
+        asset bal = asset(pay, symbol_type(S(4, EOS)));
+        action(permission_level{_self, N(active)}, N(eosio.token),
+               N(transfer), std::make_tuple(_self, itr_ref->referrer, bal,
+                                            std::string("Thanks for your referral. People love us on EOS! - MyEosVegas.com")))
+                .send();
+    } else {
+        partners.modify(itr_partner, _self, [&](auto &p) {
+            p.balance += pay;
+            p.count += 1;
+        });
+    }
+
+    auto itr_refouts = refouts.find(0);
+    if (itr_refouts == refouts.end()) {
+        refouts.emplace(_self, [&](auto &p){
+            p.eosout = pay;
+            p.count = 1;
+        });
+    } else {
+        refouts.modify(itr_refouts, _self, [&](auto &p) {
+            p.eosout += pay;
+            p.count += 1;
+        });
+    }
+
+    // delete referral to save ram
+    referrals.erase(itr_ref);
+}
+
 void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_t bettype) {
     // run sanity check here
     if (code == _self) {
@@ -1162,6 +1217,35 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
             gameid = stoi(ucm);
         }
     }
+
+    // detect referral
+    uint32_t refidx = usercomment.find("ref[");
+    if (refidx > 0 && refidx != 4294967295) {
+        uint32_t pos = usercomment.find("]", refidx);
+        if (pos > 0) {
+            string ucm = usercomment.substr(refidx + 4, pos - refidx - 4);
+
+            char * tab2 = new char [ucm.length()+1];
+            strcpy (tab2, ucm.c_str());
+            name referrer = name{string_to_name(tab2)};
+            eosio_assert(referrer != t.from, "Sorry, you cannot refer yourself.");
+
+            if ( is_account( referrer )) {
+                auto itr_ref = referrals.find(t.from);
+                if (itr_ref == referrals.end()) {
+                    referrals.emplace(_self, [&](auto &p){
+                        p.owner = name{t.from};
+                        p.referrer = referrer;
+                    });
+                } else {
+                    referrals.modify(itr_ref, _self, [&](auto &p) {
+                        p.referrer = referrer;
+                    });
+                }
+            }
+        }
+    }
+
     eosio_assert((gameid == 0 || gameid == 1 || gameid == 2), "Non-recognized game id");
     // metadatas[1] is blackjack, metadatas[2] is video poker.
     auto itr_metadata = gameid == 2 ? metadatas.find(1) : metadatas.find(2);
@@ -1468,6 +1552,10 @@ void pokergame1::dealreceipt(const name from, string game, string hash1, string 
     asset bal = asset(itr_user->betwin, symbol_type(S(4, EOS)));
     uint64_t eosin = itr_user->bet;
 
+
+    payref(from, itr_user->bet, 3);
+
+
     pools.erase(itr_user);
     /*
     pools.modify(itr_user, _self, [&](auto &p) {
@@ -1551,6 +1639,9 @@ void pokergame1::receipt5x(const name from, string game, string hash1, string ha
     // clear balance
     asset bal = asset(itr_pool->betwin, symbol_type(S(4, EOS)));
     uint64_t eosin = itr_pool->bet;
+
+    // pay referral
+    payref(from, itr_pool->bet, 3);
 
     pools.erase(itr_pool);
     pool5xs.erase(itr_pool5x);
@@ -2191,7 +2282,13 @@ void pokergame1::addpartner(const account_name partner, uint32_t rate) {
 void pokergame1::clear() {
 
     require_auth(_self);
+
     /*
+    auto itr = pools.begin();
+    while (itr != pools.end()) {
+        itr = pools.erase(itr);
+    }
+
 
     auto itr = pools.begin();
     while (itr != pools.end()) {
@@ -2201,8 +2298,6 @@ void pokergame1::clear() {
             itr++;
         }
     }
-
-
 
     auto itr2 = events.begin();
     while (itr2 != events.end()) {
@@ -2224,7 +2319,6 @@ void pokergame1::clear() {
     while (itr6 != gaccounts.end()) {
         itr6 = gaccounts.erase(itr6);
     }
-
     auto itr7 = cardstats.begin();
     while (itr7 != cardstats.end()) {
         itr7 = cardstats.erase(itr7);
@@ -2238,14 +2332,12 @@ void pokergame1::clear() {
         itr9 = paccounts.erase(itr9);
     }
 
-*/
-
     auto itr10 = bjpools.begin();
     while (itr10 != bjpools.end()) {
         itr10 = bjpools.erase(itr10);
         print("===");
     }
-
+*/
 /*
     auto itr10 = pevents.begin();
     while (itr10 != pevents.end()) {
