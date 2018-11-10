@@ -624,7 +624,7 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t gameid, uint32_
     }
     eosio_assert(gameaction == 1 || gameaction == 2 || gameaction == 3, "Blackjack: wrong action");
     // set bet cap here
-    if (gameaction == 1) {
+    if (gameaction == 1 && user != N(blockfishbgp)) {
         eosio_assert(amount >= 1000, "Blackjack: bet under minimum threshold!");
         eosio_assert(amount <= 200000, "Blackjack: bet exceeds bet cap!");
     }
