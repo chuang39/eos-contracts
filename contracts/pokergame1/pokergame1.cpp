@@ -625,8 +625,8 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t gameid, uint32_
     eosio_assert(gameaction == 1 || gameaction == 2 || gameaction == 3, "Blackjack: wrong action");
     // set bet cap here
     if (gameaction == 1) {
-        //eosio_assert(amount >= 1000, "Blackjack: bet under minimum threshold!");
-        eosio_assert(amount <= 100000, "Blackjack: bet exceeds bet cap!");
+        eosio_assert(amount >= 1000, "Blackjack: bet under minimum threshold!");
+        eosio_assert(amount <= 200000, "Blackjack: bet exceeds bet cap!");
     }
 
     //find user
@@ -1353,9 +1353,9 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         }
         // eosio_assert(gameid == 2, "Blackjack only");
 
-        auto itr_paccount = paccounts.find(user);
-        eosio_assert(itr_paccount != paccounts.end(), "Sorry, public test version is only open to VIP whose level >= 6.");
-        eosio_assert(user == N(blockfishbgp) || itr_paccount->level >= 6, "Sorry, public test version is only open to VIP whose level >= 6.");
+        //auto itr_paccount = paccounts.find(user);
+        //eosio_assert(itr_paccount != paccounts.end(), "Sorry, public test version is only open to VIP whose level >= 6.");
+        //eosio_assert(user == N(blockfishbgp) || itr_paccount->level >= 6, "Sorry, public test version is only open to VIP whose level >= 6.");
 
         depositg2(t, gameid, itr_metadata2->trounds);
     }
