@@ -978,6 +978,19 @@ void pokergame1::bjuninsure(const account_name from, uint32_t externalsrc) {
     });
 }
 
+
+bool isBlackjack(uint32_t c1, uint32_t c2) {
+    uint32_t n1 = c1 % 13;
+    uint32_t n2 = c2 % 13;
+
+
+    if (n1 == 0 && n2 >=9) return true;
+    if (n2 == 0 && n1 >=9) return true;
+
+    return false;
+}
+
+
 void pokergame1::bjreceipt(string game_id, const name from, string game, string hash, std::vector<uint32_t> dealer_hand,
         std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2, string bet, string win,
         string insure_bet, string insure_win, string dealer_hand_str, string player_hand1_str, string player_hand2_str) {
@@ -1006,6 +1019,43 @@ void pokergame1::bjreceipt(string game_id, const name from, string game, string 
     eosio_assert(dcards_in == itr_bjpool->dcards, "Blackjack: dealer cards mismatch");
     eosio_assert(pcards1_in == itr_bjpool->pcards1, "Blackjack: 1st hand mismatches");
     eosio_assert(pcards2_in == itr_bjpool->pcards2, "Blackjack: 2nd hand mismatches");
+
+
+    // blackjack promo
+    uint64_t bjeventpay = 0;
+    if (isBlackjack(player_hand1[0], player_hand1[1]) && itr_bjpool->bet >= 10000) {
+        auto itr_bjevent = bjevents.find(from);
+        if (itr_bjevent == bjevents.end()) {
+            itr_bjevent = bjevents.emplace(_self, [&](auto &p){
+                p.owner = from;
+                p.count = 0;
+                p.eosout = 0;
+            });
+        }
+
+        if (itr_bjevent->eosout < 160000) {
+            if ((itr_bjevent->count + 1) == 111) {
+                bjeventpay = 50000;
+            } else if ((itr_bjevent->count + 1) % 11 == 0) {
+                bjeventpay = 10000;
+            }
+
+            bjevents.modify(itr_bjevent, _self, [&](auto &p) {
+                p.count = p.count + 1;
+                p.eosout = p.eosout + bjeventpay;
+            });
+
+            if (bjeventpay > 0) {
+                asset balbj = asset(bjeventpay, symbol_type(S(4, EOS)));
+
+                // withdraw
+                action(permission_level{_self, N(active)}, N(eosio.token),
+                       N(transfer), std::make_tuple(_self, from, balbj,
+                                                    std::string("Awesome, you won a Blackjack! - blackjack.MyEosVegas.com")))
+                        .send();
+            }
+        }
+    }
 
     uint64_t betnum = 0;
     uint64_t winnum = 0;
@@ -1094,7 +1144,7 @@ void pokergame1::bjreceipt(string game_id, const name from, string game, string 
                                         std::string("Gaming deserves rewards! - blackjack.MyEosVegas.com")))
             .send();
 
-    report(from, minemev, (itr_bjpool->bet + itr_bjpool->insurance), (itr_bjpool->betwin + itr_bjpool->insurancewin), 2);  // blackjack gameid = 2;
+    report(from, minemev, (itr_bjpool->bet + itr_bjpool->insurance), (itr_bjpool->betwin + itr_bjpool->insurancewin + bjeventpay), 2);  // blackjack gameid = 2;
 
 
     auto itr_metadata1 = metadatas.find(1);

@@ -58,7 +58,9 @@ public:
              puevents(_self, _self),
              bjwins(_self, _self),
              partners(_self, _self),
-             referrals(_self, _self){};
+             referrals(_self, _self),
+             refouts(_self, _self),
+             bjevents(_self, _self){};
 
     //@abi action
     void dealreceipt(const name from, string game, string hash1, string hash2, string cards, string result, string betineos, string winineos);
@@ -133,6 +135,9 @@ public:
     void depositg2(const currency::transfer &t, uint32_t gameid, uint32_t trounds);
     void bj_get_cards(uint64_t cards, uint32_t count, uint32_t* arr);
     uint32_t bj_get_stat(uint32_t status);
+
+
+    void payref(name from, uint64_t bet, uint32_t defaultrate);
 
 private:
     // 0: jacks or better
@@ -394,10 +399,32 @@ private:
         uint32_t rate;
         uint64_t eosout;
         uint64_t count;
+        uint64_t balance;
 
         uint64_t primary_key() const { return owner; }
-        EOSLIB_SERIALIZE(st_partners, (owner)(rate)(eosout)(count))
+        EOSLIB_SERIALIZE(st_partners, (owner)(rate)(eosout)(count)(balance))
     };
+
+    // @abi table refouts i64
+    struct st_refouts {
+        uint64_t id;
+        uint64_t eosout;
+        uint64_t count;
+
+        uint64_t primary_key() const { return id; }
+        EOSLIB_SERIALIZE(st_refouts, (id)(eosout)(count))
+    };
+
+    // @abi table bjevents i64
+    struct st_bjevents {
+        name owner;
+        uint64_t count;
+        uint64_t eosout;
+
+        uint64_t primary_key() const { return owner; }
+        EOSLIB_SERIALIZE(st_bjevents, (owner)(count)(eosout))
+    };
+
 
     // @abi table referrals i64
     struct st_referrals {
@@ -407,8 +434,6 @@ private:
         uint64_t primary_key() const { return owner; }
         EOSLIB_SERIALIZE(st_referrals, (owner)(referrer))
     };
-
-
 
     typedef multi_index<N(metadatas), st_metadatas> _tb_metadatas;
     _tb_metadatas metadatas;
@@ -449,9 +474,14 @@ private:
     typedef multi_index<N(puevents), st_puevents> _tb_puevents;
     _tb_puevents puevents;
 
-
     typedef multi_index<N(partners), st_partners> _tb_partners;
     _tb_partners partners;
+    typedef multi_index<N(refouts), st_refouts> _tb_refouts;
+    _tb_refouts refouts;
+
     typedef multi_index<N(referrals), st_referrals> _tb_referrals;
     _tb_referrals referrals;
+
+    typedef multi_index<N(bjevents), st_bjevents> _tb_bjevents;
+    _tb_bjevents bjevents;
 };
