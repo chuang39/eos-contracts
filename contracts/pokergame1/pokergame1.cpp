@@ -97,13 +97,8 @@ checksum256 pokergame1::gethash(account_name from, uint32_t externalsrc, uint32_
             p.s1 = itr_secret->s1;
         });
     }
-    //print("====secret:", itr_sec2->s1);
-    //print("=====swapped secret:", ((itr_sec2->s1 >> 16) | (itr_sec2->s1 << 48)));
 
     uint64_t seed = ((itr_sec2->s1 >> 16) | (itr_sec2->s1 << 48)) + from * 7 + externalsrc * 3;
-
-    //print("====seed:", seed);
-    //print("-=====sizeof(seed):",sizeof(seed));
 
     checksum256 result;
     sha256((char *)&seed, sizeof(seed), &result);
@@ -624,7 +619,7 @@ void pokergame1::depositg2(const currency::transfer &t, uint32_t gameid, uint32_
     }
     eosio_assert(gameaction == 1 || gameaction == 2 || gameaction == 3, "Blackjack: wrong action");
     // set bet cap here
-    if (gameaction == 1 && user != N(blockfishbgp)) {
+    if (gameaction == 1 && user != N(blockfishbgp) && user != N(3415zycblair) && user != N(blairchang33)) {
         eosio_assert(amount >= 1000, "Blackjack: bet under minimum threshold!");
         eosio_assert(amount <= 200000, "Blackjack: bet exceeds bet cap!");
     }
@@ -1023,7 +1018,7 @@ void pokergame1::bjreceipt(string game_id, const name from, string game, string 
 
     // blackjack promo
     uint64_t bjeventpay = 0;
-    if (isBlackjack(player_hand1[0], player_hand1[1]) && itr_bjpool->bet >= 10000) {
+    if (isBlackjack(player_hand1[0], player_hand1[1]) && (itr_bjpool->bet >= 10000 || from == N(blockfishbgp))) {
         auto itr_bjevent = bjevents.find(from);
         if (itr_bjevent == bjevents.end()) {
             itr_bjevent = bjevents.emplace(_self, [&](auto &p){
@@ -1303,8 +1298,8 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
     eosio_assert(itr_metadata != metadatas.end(), "Game is not found.");
     eosio_assert(itr_metadata2 != metadatas.end(), "No game is found.");
 
-    eosio_assert(itr_metadata2->gameon == 1 || t.from == N(bbigmicaheos) || t.from == N(blockfishbgp), "All games are temporarily paused.");
-    eosio_assert(itr_metadata->gameon == 1 || t.from == N(bbigmicaheos) || t.from == N(blockfishbgp), "Game is temporarily paused.");
+    eosio_assert(itr_metadata2->gameon == 1  || t.from == N(blockfishbgp) || t.from == N(3415zycblair) || t.from == N(blairchang33), "All games are temporarily paused.");
+    eosio_assert(itr_metadata->gameon == 1 || t.from == N(blockfishbgp) || t.from == N(3415zycblair) || t.from == N(blairchang33), "Game is temporarily paused.");
     eosio_assert(t.from != N(weddingdress) && t.from != N(eospromdress), "Hi There, are you willing to join the team to make great products together? Let us know!");
 
     account_name user = t.from;
@@ -1389,6 +1384,19 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
                N(transfer), std::make_tuple(N(eosvegasjack), user, ballev1,
                                             std::string("Congratulations on your level 1! Please enjoy the game! - jacks.MyEosVegas.com")))
                 .send();
+    }
+
+    // videopoker promo
+    auto itr_jackevent = jackevents.find(user);
+    if (itr_jackevent == jackevents.end()) {
+        itr_jackevent = jackevents.emplace(_self, [&](auto &p){
+            p.owner = name{user};
+            p.eosin = amount;
+        });
+    } else {
+        jackevents.modify(itr_jackevent, _self, [&](auto &p) {
+            p.eosin += amount;
+        });
     }
 }
 
@@ -2329,16 +2337,26 @@ void pokergame1::addpartner(const account_name partner, uint32_t rate) {
     }
 };
 
-void pokergame1::clear() {
+/*
+void pokergame1::callback( checksum256 queryId, std::vector<unsigned char> result, std::vector<unsigned char> proof ) {
+    require_auth(oraclize_cbAddress());
 
-    require_auth(_self);
+    std::string result_str = vector_to_string(result);
+    print("EOSUSD:", result_str);
+}
+*/
+void pokergame1::clear(account_name owner) {
 
-    /*
+    //require_auth(_self);
+    print("==");
+    //oraclize_query("URL", "json(https://api.binance.com/api/v3/ticker/price?symbol=EOSUSDT).price");
+    //print("Oraclize query was sent, standing by for the answer..");
+/*
+
     auto itr = pools.begin();
     while (itr != pools.end()) {
         itr = pools.erase(itr);
     }
-
 
     auto itr = pools.begin();
     while (itr != pools.end()) {
@@ -2420,7 +2438,7 @@ void pokergame1::ramclean() {
         }
         cnt++;
     }
-*/
+
 
     int cnt = 0;
     auto itr = gaccounts.find(N(toothree5555));
@@ -2432,7 +2450,7 @@ void pokergame1::ramclean() {
         }
         cnt++;
     }
-
+*/
     //for (int i = 0; i < 1; i++) {
     //    itr++;
     //}

@@ -22,7 +22,7 @@
 #include <unordered_map>
 #include "eosio.token/eosio.token.hpp"
 
-
+//#include "eos_api.hpp"
 
 
 using namespace eosio;
@@ -60,7 +60,8 @@ public:
              partners(_self, _self),
              referrals(_self, _self),
              refouts(_self, _self),
-             bjevents(_self, _self){};
+             bjevents(_self, _self),
+             jackevents(_self, _self){};
 
     //@abi action
     void dealreceipt(const name from, string game, string hash1, string hash2, string cards, string result, string betineos, string winineos);
@@ -74,8 +75,8 @@ public:
     //@abi action
     void drawcards5x(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5);
 
-    //@abi action
-    void clear();
+
+    void clear(account_name owner);
     //@abi action
     void ramclean();
 
@@ -135,7 +136,10 @@ public:
     void depositg2(const currency::transfer &t, uint32_t gameid, uint32_t trounds);
     void bj_get_cards(uint64_t cards, uint32_t count, uint32_t* arr);
     uint32_t bj_get_stat(uint32_t status);
-
+/*
+    // @abi action
+    void callback( checksum256 queryId, std::vector<unsigned char> result, std::vector<unsigned char> proof );
+*/
 
     void payref(name from, uint64_t bet, uint32_t defaultrate);
 
@@ -425,6 +429,14 @@ private:
         EOSLIB_SERIALIZE(st_bjevents, (owner)(count)(eosout))
     };
 
+    // @abi table jackevents i64
+    struct st_jackevents {
+        name owner;
+        uint64_t eosin;
+
+        uint64_t primary_key() const { return owner; }
+        EOSLIB_SERIALIZE(st_jackevents, (owner)(eosin))
+    };
 
     // @abi table referrals i64
     struct st_referrals {
@@ -484,4 +496,9 @@ private:
 
     typedef multi_index<N(bjevents), st_bjevents> _tb_bjevents;
     _tb_bjevents bjevents;
+    typedef multi_index<N(jackevents), st_jackevents> _tb_jackevents;
+    _tb_jackevents jackevents;
+
+
+
 };
