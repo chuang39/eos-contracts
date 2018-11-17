@@ -43,8 +43,6 @@ public:
              pools(_self, _self),
              events(_self, _self),
              metadatas(_self, _self),
-             secrets(_self, _self),
-             secrets2(_self, _self),
              ginfos(_self, _self),
              gaccounts(_self, _self),
              cardstats(_self, _self),
@@ -61,21 +59,25 @@ public:
              referrals(_self, _self),
              refouts(_self, _self),
              bjevents(_self, _self),
-             jackevents(_self, _self){};
-
+             jackevents(_self, _self),
+             nonces(_self, _self),
+             vppools(_self, _self),
+             pubkeys(_self, _self){};
     //@abi action
-    void dealreceipt(const name from, string game, string hash1, string hash2, string cards, string result, string betineos, string winineos);
-
+    void vpreceipt(string game_id, const name player, string game, std::vector<string> player_hand,
+                   string bet, string win, string wintype, string seed, string dealer_signature);
     //@abi action
-    void receipt5x(const name from, string game, string hash1, string hash2, string cards1, string cards2, string cards3,
-            string cards4, string cards5, string results, string betineos, string winineo);
+    void vp5xreceipt(string game_id, const name player, string game, std::vector<string> player_hand1
+            , std::vector<string> player_hand2, std::vector<string> player_hand3, std::vector<string> player_hand4,
+            std::vector<string> player_hand5, string bet, string win, string wintype, string seed,
+            string dealer_signature);
 
     //@abi action
     void drawcards(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5);
     //@abi action
     void drawcards5x(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5);
 
-
+    //@abi action
     void clear(account_name owner);
     //@abi action
     void ramclean();
@@ -100,6 +102,10 @@ public:
     void blacklist(const name to, uint32_t status);
     //@abi action
     void init();
+
+    //@abi action
+    void forceclear(const name from);
+
 
     //@abi action
     void bjstand(const name from, string hash, std::vector<uint32_t> dealer_hand, std::vector<uint32_t> player_hand1,
@@ -131,7 +137,6 @@ public:
 
     uint32_t checkace(uint32_t numbers[5]);
 
-
     void depositg1(const currency::transfer &t, uint32_t gameid, uint32_t trounds, uint32_t bettype);
     void depositg2(const currency::transfer &t, uint32_t gameid, uint32_t trounds);
     void bj_get_cards(uint64_t cards, uint32_t count, uint32_t* arr);
@@ -142,6 +147,15 @@ public:
 */
 
     void payref(name from, uint64_t bet, uint32_t defaultrate);
+
+    //@abi action
+    void vpdraw(const name from, std::vector<string> actions);
+    //@abi action
+    void vpdraw5x(const name from, std::vector<string> actions);
+
+    //@abi action
+    void setpubkey(string public_key);
+
 
 private:
     // 0: jacks or better
@@ -159,6 +173,35 @@ private:
         uint64_t primary_key() const { return id; }
 
         EOSLIB_SERIALIZE(st_metadatas, (id)(eventcnt)(idx)(gameon)(miningon)(tmevout)(teosin)(teosout)(trounds))
+    };
+
+
+    // @abi table nonces i64
+    struct st_nonces {
+        name owner;
+        uint32_t number;
+
+        uint64_t primary_key() const { return owner; }
+        EOSLIB_SERIALIZE(st_nonces, (owner)(number))
+    };
+
+    // @abi table vppools i64
+    struct st_vppools {
+        name owner;
+        uint32_t status;
+        uint32_t mode;
+        uint64_t nonce;
+        uint64_t bet;
+        string card1;
+        string card2;
+        string card3;
+        string card4;
+        string card5;
+        string bettoken;
+        string seed;
+
+        uint64_t primary_key() const { return owner; }
+        EOSLIB_SERIALIZE(st_vppools, (owner)(status)(mode)(nonce)(bet)(card1)(card2)(card3)(card4)(card5)(bettoken)(seed))
     };
 
     // @abi table pools i64
@@ -229,8 +272,6 @@ private:
         EOSLIB_SERIALIZE(st_bjpools, (owner)(status)(dcards)(dcnt)(pcards1)(pcnt1)(pcards2)(pcnt2)(wintype)(betcurrency)(bet)(betwin)(insurance)(insurancewin)(userseed)(cardhash))
     };
 
-
-
     // @abi table bjwins i64
     struct st_bjwins {
         uint64_t id;
@@ -243,6 +284,14 @@ private:
         EOSLIB_SERIALIZE(st_bjwins, (id)(owner)(datetime)(win))
     };
 
+    // @abi table pubkeys i64
+    struct st_pubkeys {
+        uint64_t id;
+        string pubkey;
+
+        uint64_t primary_key() const { return id; }
+        EOSLIB_SERIALIZE(st_pubkeys, (id)(pubkey))
+    };
 
     // @abi table paccounts i64
     struct st_paccounts {
@@ -295,20 +344,6 @@ private:
         uint64_t primary_key() const { return id; }
 
         EOSLIB_SERIALIZE(st_events, (id)(owner)(datetime)(wintype)(ratio)(bet)(betwin)(card1)(card2)(card3)(card4)(card5))
-    };
-
-    struct st_secrets {
-        uint64_t id;
-        uint64_t s1;
-        uint64_t primary_key() const { return id; }
-        EOSLIB_SERIALIZE(st_secrets, (id)(s1))
-    };
-
-    struct st_secrets2 {
-        name owner;
-        uint64_t s1;
-        uint64_t primary_key() const { return owner; }
-        EOSLIB_SERIALIZE(st_secrets2, (owner)(s1))
     };
 
     // @abi table ginfos i64
@@ -447,6 +482,7 @@ private:
         EOSLIB_SERIALIZE(st_referrals, (owner)(referrer))
     };
 
+
     typedef multi_index<N(metadatas), st_metadatas> _tb_metadatas;
     _tb_metadatas metadatas;
     typedef multi_index<N(pools), st_pools> _tb_pools;
@@ -455,10 +491,6 @@ private:
     _tb_pool5xs pool5xs;
     typedef multi_index<N(events), st_events> _tb_events;
     _tb_events events;
-    typedef multi_index<N(secrets), st_secrets> _tb_secrets;
-    _tb_secrets secrets;
-    typedef multi_index<N(secrets2), st_secrets2> _tb_secrets2;
-    _tb_secrets2 secrets2;
     typedef multi_index<N(ginfos), st_ginfos> _tb_ginfos;
     _tb_ginfos ginfos;
     typedef multi_index<N(gaccounts), st_gaccounts> _tb_gaccounts;
@@ -500,5 +532,11 @@ private:
     _tb_jackevents jackevents;
 
 
+    typedef multi_index<N(vppools), st_vppools> _tb_vppools;
+    _tb_vppools vppools;
+    typedef multi_index<N(nonces), st_nonces> _tb_nonces;
+    _tb_nonces nonces;
 
+    typedef multi_index<N(pubkeys), st_pubkeys> _tb_pubkeys;
+    _tb_pubkeys pubkeys;
 };
