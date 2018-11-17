@@ -1334,6 +1334,15 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
     }
 
     if (gameid == 0 || gameid == 1) {
+
+        if (gameid == 0) {
+            eosio_assert(t.quantity.amount >= 100, "Jacks-or-Better: Below minimum bet threshold!");
+            eosio_assert(t.quantity.amount <= 100000, "Jacks-or-Better:Exceeds bet cap!");
+        } else if (gameid == 1) {
+            eosio_assert(t.quantity.amount >= 500, "Jacks-or-Better 5x:Below minimum bet threshold!");
+            eosio_assert(t.quantity.amount <= 500000, "Jacks-or-Better 5x:Exceeds bet cap!");
+        }
+
         auto itr_vppool = vppools.find(user);
         uint32_t mode = (gameid == 0) ? 0 : 1;
         if (itr_vppool == vppools.end()) {
