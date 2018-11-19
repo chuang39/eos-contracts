@@ -73,11 +73,6 @@ public:
             string dealer_signature);
 
     //@abi action
-    void drawcards(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5);
-    //@abi action
-    void drawcards5x(const name from, uint32_t externalsrc, string dump1, string dump2, string dump3, string dump4, string dump5);
-
-    //@abi action
     void clear(account_name owner);
     //@abi action
     void ramclean();
@@ -146,7 +141,7 @@ public:
     void callback( checksum256 queryId, std::vector<unsigned char> result, std::vector<unsigned char> proof );
 */
 
-    void payref(name from, uint64_t bet, uint32_t defaultrate);
+    void payref(name from, uint64_t bet, uint32_t defaultrate, uint32_t multiplier);
 
     //@abi action
     void vpdraw(const name from, std::vector<string> actions);
