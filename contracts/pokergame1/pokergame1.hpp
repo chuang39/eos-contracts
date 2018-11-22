@@ -132,7 +132,6 @@ public:
 
     uint32_t checkace(uint32_t numbers[5]);
 
-    void depositg1(const currency::transfer &t, uint32_t gameid, uint32_t trounds, uint32_t bettype);
     void depositg2(const currency::transfer &t, uint32_t gameid, uint32_t trounds);
     void bj_get_cards(uint64_t cards, uint32_t count, uint32_t* arr);
     uint32_t bj_get_stat(uint32_t status);

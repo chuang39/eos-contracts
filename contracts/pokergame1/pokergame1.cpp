@@ -233,73 +233,6 @@ uint32_t get_bj_color(uint32_t card) {
 }
 
 
-void pokergame1::depositg1(const currency::transfer &t, uint32_t gameid, uint32_t trounds, uint32_t bettype) {
-
-    account_name user = t.from;
-    auto amount = t.quantity.amount;
-    if (gameid == 0) {
-        eosio_assert(amount >= 100, "Below minimum bet threshold!");
-        eosio_assert(amount <= 100000, "Exceeds bet cap!");
-    } else if (gameid == 1) {
-        eosio_assert(amount >= 500, "Below minimum bet threshold!");
-        eosio_assert(amount <= 500000, "Exceeds bet cap!");
-    }
-
-    // start a new round
-    // deposit money and draw 5 cards
-    //checksum256 roothash = gethash(user, 0, trounds);
-    checksum256 roothash = gethash(user, 0, 0);
-    string rhash;
-
-    for( int i = 0; i < 32; ++i )
-    {
-        char const byte = roothash.hash[i];
-        rhash += hex_chars[ ( byte & 0xF0 ) >> 4 ];
-        rhash += hex_chars[ ( byte & 0x0F ) >> 0 ];
-    }
-
-    uint32_t cnt = 5;
-    uint32_t* arr;
-    std::set<uint32_t> myset;
-
-    uint32_t arr1[5];
-    getcards(user, roothash, arr1, 5, myset, amount, 52);
-    arr = arr1;
-
-    /*
-    if (user == N(gy2tinbvhage) && amount >= 100000) {
-        uint32_t mm = roothash.hash[0] % 3 + 1;
-        arr[3] = (arr[0] + 13) % 52;
-        arr[4] = (arr[3] + 13) % 52;
-        arr[2] = (arr[3] + 1) % 52;
-        arr[1] = (arr[3] + 5 * mm) % 52;
-    }
-    */
-
-    auto itr_user1 = pools.find(user);
-    pools.modify(itr_user1, _self, [&](auto &p){
-        p.status = gameid;
-        p.bet = amount;
-        p.betcurrency = bettype;
-        p.card1 = arr[0];
-        p.card2 = arr[1];
-        p.card3 = arr[2];
-        p.card4 = arr[3];
-        p.card5 = arr[4];
-        p.cardhash1 = rhash;
-        p.cardhash2 = "";
-        p.betwin = 0;
-        p.wintype = 0;
-    });
-
-    // jackpot
-    auto itr_pevent = pevents.find(0);
-    pevents.modify(itr_pevent, _self, [&](auto &p) {
-        uint64_t tempam = amount * 0.01;
-        p.eosin += tempam;
-    });
-}
-
 
 /********************* Blackjack *****************************/
 
@@ -1200,7 +1133,7 @@ void pokergame1::payref(name from, uint64_t bet, uint32_t defaultrate, uint32_t 
         asset bal = asset(pay, symbol_type(S(4, EOS)));
         action(permission_level{_self, N(active)}, N(eosio.token),
                N(transfer), std::make_tuple(_self, itr_ref->referrer, bal,
-                                            std::string("Thanks for your referral. People love us on EOS! - MyEosVegas.com")))
+                                            std::string("Thanks for your referral. People love us on EOS! - ROVegas.com")))
                 .send();
     } else {
         asset bal = asset(pay, symbol_type(S(4, EOS)));
@@ -1363,6 +1296,13 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
             p.bet = t.quantity.amount;
         });
 
+        // jackpot
+        auto itr_pevent = pevents.find(0);
+        pevents.modify(itr_pevent, _self, [&](auto &p) {
+            uint64_t tempam = t.quantity.amount * 0.005;
+            p.eosin += tempam;
+        });
+
     }
 
     // update user exp and level
@@ -1392,13 +1332,13 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         asset ballev1 = asset(500000, symbol_type(S(4, MEV)));
         action(permission_level{_self, N(active)}, N(eosvegascoin),
                N(transfer), std::make_tuple(N(eosvegasjack), user, ballev1,
-                                            std::string("Congratulations on your level 1! Please enjoy the game! - jacks.MyEosVegas.com")))
+                                            std::string("Congratulations on your level 1! Please enjoy the game! - ROVegas.com")))
                 .send();
     }
 
+/*
     // TODO
     // videopoker promo
-    /*
     auto itr_jackevent = jackevents.find(user);
     if (itr_jackevent == jackevents.end()) {
         itr_jackevent = jackevents.emplace(_self, [&](auto &p){
@@ -1410,7 +1350,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
             p.eosin += amount;
         });
     }
-     */
+    */
 }
 
 void pokergame1::report(name from, uint64_t minemev, uint64_t meosin, uint64_t meosout, uint32_t gameid) {
@@ -1683,6 +1623,44 @@ void pokergame1::vpreceipt(string game_id, const name player, string game, std::
         });
     }
 
+    //jackpot
+    uint32_t isjackpot = 0;
+    if (type == 9) {
+        isjackpot = 1;
+    }
+    if (isjackpot == 1 && bettokenstr == "EOS") {
+        auto itr_pevent = pevents.find(0);
+        uint64_t tempam = 0;
+        if (itr_vppool->bet >= 50000) {
+            tempam = itr_pevent->eosin * 0.9;
+            puevents.emplace(_self, [&](auto &p) {
+                p.id = puevents.available_primary_key();
+                p.owner = player;
+                p.type = 1;
+            });
+        } else if (itr_vppool->bet >= 10000 && itr_vppool->bet< 50000) {
+            tempam = itr_pevent->eosin * 0.18;
+            puevents.emplace(_self, [&](auto &p) {
+                p.id = puevents.available_primary_key();
+                p.owner = player;
+                p.type = 2;
+            });
+        } else if (itr_vppool->bet >= 2500 && itr_vppool->bet < 10000) {
+            tempam = itr_pevent->eosin * 0.045;
+            puevents.emplace(_self, [&](auto &p) {
+                p.id = puevents.available_primary_key();
+                p.owner = player;
+                p.type = 3;
+            });
+        }
+
+        pevents.modify(itr_pevent, _self, [&](auto &p) {
+            p.eosin = p.eosin - tempam;
+        });
+        winnum += tempam;
+    }
+
+
     vppools.erase(itr_vppool);
 
     if (bettokenstr == "EOS") {
@@ -1791,6 +1769,7 @@ void pokergame1::vp5xreceipt(string game_id, const name player, string game, std
 
     payref(player, itr_vppool->bet, 3, 3);
 
+    uint32_t isjackpot = 0;
     // update wins
     auto itr_metadatag2 = metadatas.find(2);
     for (int i = 0; i < 5; i++) {
@@ -1836,6 +1815,10 @@ void pokergame1::vp5xreceipt(string game_id, const name player, string game, std
                 p.eventcnt = p.eventcnt + 1;
             });
         }
+
+        if (type == 9) {
+            isjackpot = 1;
+        }
     }
     while (itr_metadatag2->eventcnt > 32) {
         auto itr_event2 = events.begin();
@@ -1843,6 +1826,38 @@ void pokergame1::vp5xreceipt(string game_id, const name player, string game, std
         metadatas.modify(itr_metadatag2, _self, [&](auto &p){
             p.eventcnt = p.eventcnt - 1;
         });
+    }
+
+    if (isjackpot == 1 && bettokenstr == "EOS") {
+        auto itr_pevent = pevents.find(0);
+        uint64_t tempam = 0;
+        if (itr_vppool->bet >= 250000) {
+            tempam = itr_pevent->eosin * 0.9;
+            puevents.emplace(_self, [&](auto &p) {
+                p.id = puevents.available_primary_key();
+                p.owner = player;
+                p.type = 1;
+            });
+        } else if (itr_vppool->bet >= 50000 && itr_vppool->bet< 250000) {
+            tempam = itr_pevent->eosin * 0.18;
+            puevents.emplace(_self, [&](auto &p) {
+                p.id = puevents.available_primary_key();
+                p.owner = player;
+                p.type = 2;
+            });
+        } else if (itr_vppool->bet >= 2500 && itr_vppool->bet < 50000) {
+            tempam = itr_pevent->eosin * 0.045;
+            puevents.emplace(_self, [&](auto &p) {
+                p.id = puevents.available_primary_key();
+                p.owner = player;
+                p.type = 3;
+            });
+        }
+
+        pevents.modify(itr_pevent, _self, [&](auto &p) {
+            p.eosin = p.eosin - tempam;
+        });
+        winnum += tempam;
     }
 
     vppools.erase(itr_vppool);
@@ -2462,7 +2477,7 @@ void pokergame1::clear(account_name owner) {
 
     auto itr = metadatas.find(0);
     metadatas.modify(itr, _self, [&](auto &p) {
-        p.teosout += 65000000;
+        p.teosout += 5000000;
     });
 
     //auto itr = vppools.begin();
@@ -2659,13 +2674,11 @@ for (auto itr = gaccounts.begin();  cnt < ; itr++) {
 void pokergame1::init() {
     require_auth(_self);
 
-    uint32_t aa[4] = {301, 36, 5, 0};
-    for( int i = 0; i < 4; ++i ) {
-        pevents.emplace(_self, [&](auto &p) {
-            p.id = i;
-            p.count = aa[i];
-        });
-    }
+    auto itr = pevents.find(0);
+    pevents.modify(itr, _self, [&](auto &p) {
+        p.eosin = 5000000;
+    });
+
 }
 
 void pokergame1::setgameon(uint64_t id, uint32_t flag) {
@@ -2821,7 +2834,7 @@ void pokergame1::getbonus(const name from, const uint32_t type, uint32_t externa
     asset bal = asset(bamount, symbol_type(S(4, EOS)));
     action(permission_level{_self, N(active)}, N(eosio.token),
         N(transfer), std::make_tuple(_self, from, bal,
-                                    std::string("Welcome! Daily bonus to enjoy the game @ MyEosVegas.com!")))
+                                    std::string("Welcome! Daily bonus to enjoy the game @ rovegas.com!")))
         .send();
 }
 
