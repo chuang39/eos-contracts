@@ -62,7 +62,9 @@ public:
              jackevents(_self, _self),
              nonces(_self, _self),
              vppools(_self, _self),
-             pubkeys(_self, _self){};
+             pubkeys(_self, _self),
+             prefs(_self, _self),
+             mevouts(_self, _self){};
     //@abi action
     void vpreceipt(string game_id, const name player, string game, std::vector<string> player_hand,
                    string bet, string win, string wintype, string seed, string dealer_signature);
@@ -74,6 +76,8 @@ public:
 
     //@abi action
     void clear(account_name owner);
+    //@abi action
+    void resetdivi();
     //@abi action
     void ramclean();
 
@@ -103,17 +107,13 @@ public:
 
 
     //@abi action
-    void bjstand(const name from, string hash, std::vector<uint32_t> dealer_hand, std::vector<uint32_t> player_hand1,
-            std::vector<uint32_t> player_hand2);
+    void bjstand(const name player);
     //@abi action
-    void bjhit(const name from, string hash, std::vector<uint32_t> dealer_hand,
-               std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2);
+    void bjhit(const name player);
     //@abi action
-    void bjuninsure(const account_name from, uint32_t externalsrc);
+    void bjuninsure(const name player);
     //@abi action
-    void bjreceipt(string game_id, const name from, string game, string hash, std::vector<uint32_t> dealer_hand,
-                   std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2, string bet, string win,
-                   string insure_bet, string insure_win, string dealer_hand_str, string player_hand1_str, string player_hand2_str);
+    void bjreceipt(string game_id, const name from, string game);
 
     //@abi action
     void addpartner(const account_name partner, uint32_t rate);
@@ -150,6 +150,7 @@ public:
     //@abi action
     void setpubkey(string public_key);
 
+    void updatemevout(name player, uint32_t nonce, uint64_t mevout);
 
 private:
     // 0: jacks or better
@@ -196,6 +197,17 @@ private:
 
         uint64_t primary_key() const { return owner; }
         EOSLIB_SERIALIZE(st_vppools, (owner)(status)(mode)(nonce)(bet)(card1)(card2)(card3)(card4)(card5)(bettoken)(seed))
+    };
+
+    // @abi table mevouts i64
+    struct st_mevouts {
+        name owner;
+        uint32_t nonce;
+        uint64_t mevout;
+        uint64_t lastseen;
+
+        uint64_t primary_key() const { return owner; }
+        EOSLIB_SERIALIZE(st_mevouts, (owner)(nonce)(mevout)(lastseen))
     };
 
     // @abi table pools i64
@@ -246,24 +258,21 @@ private:
     struct st_bjpools {
         name owner;
         uint32_t status;
+        uint64_t nonce;
         uint64_t dcards;
         uint32_t dcnt;
         uint64_t pcards1;
         uint32_t pcnt1;
         uint64_t pcards2;
         uint32_t pcnt2;
-        uint32_t wintype;
-        uint32_t betcurrency;
         uint64_t bet;
         uint64_t betwin;
-        uint64_t insurance;
-        uint64_t insurancewin;
-        uint64_t userseed;
-        string cardhash;
+        string bettoken;
+        string seed;
 
         uint64_t primary_key() const { return owner; }
 
-        EOSLIB_SERIALIZE(st_bjpools, (owner)(status)(dcards)(dcnt)(pcards1)(pcnt1)(pcards2)(pcnt2)(wintype)(betcurrency)(bet)(betwin)(insurance)(insurancewin)(userseed)(cardhash))
+        EOSLIB_SERIALIZE(st_bjpools, (owner)(status)(nonce)(dcards)(dcnt)(pcards1)(pcnt1)(pcards2)(pcnt2)(bet)(betwin)(bettoken)(seed))
     };
 
     // @abi table bjwins i64
@@ -476,6 +485,14 @@ private:
         EOSLIB_SERIALIZE(st_referrals, (owner)(referrer))
     };
 
+    // @abi table prefs i64
+    struct st_prefs {
+        name owner;
+        name partner;
+
+        uint64_t primary_key() const { return owner; }
+        EOSLIB_SERIALIZE(st_prefs, (owner)(partner))
+    };
 
     typedef multi_index<N(metadatas), st_metadatas> _tb_metadatas;
     _tb_metadatas metadatas;
@@ -519,6 +536,8 @@ private:
 
     typedef multi_index<N(referrals), st_referrals> _tb_referrals;
     _tb_referrals referrals;
+    typedef multi_index<N(prefs), st_prefs> _tb_prefs;
+    _tb_prefs prefs;
 
     typedef multi_index<N(bjevents), st_bjevents> _tb_bjevents;
     _tb_bjevents bjevents;
@@ -533,4 +552,7 @@ private:
 
     typedef multi_index<N(pubkeys), st_pubkeys> _tb_pubkeys;
     _tb_pubkeys pubkeys;
+
+    typedef multi_index<N(mevouts), st_mevouts> _tb_mevouts;
+    _tb_mevouts mevouts;
 };
