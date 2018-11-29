@@ -3,8 +3,8 @@
 #define DEBUG 0
 
 // (# of mev) = (# of eos) * miningtable[][1] / 100
-uint64_t miningtable[5][2] = {{400000000000, 400}, // 1EOS 4MEV
-                              {400000000000 * 2, 200}, // 1EOS 2MEV
+uint64_t miningtable[5][2] = {{200000000000, 400}, // 1EOS 4MEV
+                              {200000000000 * 3, 200}, // 1EOS 2MEV
                                {400000000000 * 3, 100}, // 1EOS 1MEV
                                {400000000000 * 4, 50}, // 2EOS 1MEV
                                {400000000000 * 5, 10} // 10EOS 1MEV
@@ -19,8 +19,8 @@ uint32_t bjvalues[13] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10};
 //string tokentable[1] = {"MEV"};
 
 // experience multiplier by game
-uint32_t expbygame[3] = {50, 50, 25};
-uint32_t minebygame[3] = {100, 100, 50};      // xN/100
+uint32_t expbygame[3] = {50, 50, 12};
+uint32_t minebygame[3] = {100, 100, 25};      // xN/100
 
 
 // check if the player wins or not
@@ -911,12 +911,6 @@ void pokergame1::bjuninsure(const account_name from, uint32_t externalsrc) {
 }
 */
 
-
-
-void pokergame1::bjhit(const name player) {}
-void pokergame1::bjuninsure(const name player) {}
-void pokergame1::bjstand(const name player) {}
-
 bool isBlackjack(uint32_t c1, uint32_t c2) {
     uint32_t n1 = c1 % 13;
     uint32_t n2 = c2 % 13;
@@ -927,15 +921,103 @@ bool isBlackjack(uint32_t c1, uint32_t c2) {
 
     return false;
 }
-//void pokergame1::bjreceipt(string game_id, const name player, string game, string hash, std::vector<uint32_t> dealer_hand,
-//                           std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2, string bet, string win,
-//                           string insure_bet, string insure_win, string dealer_hand_str, string player_hand1_str, string player_hand2_str) {
-void pokergame1::bjreceipt(string game_id, const name player, string game) {
+
+void pokergame1::bjhit(const name player, std::vector<uint32_t> dealer_hand,
+        std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2) {}
+void pokergame1::bjuninsure(const name player, std::vector<uint32_t> dealer_hand,
+        std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2) {}
+void pokergame1::bjstand(const name player, std::vector<uint32_t> dealer_hand,
+        std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2) {}
+
+void pokergame1::bjreceipt(string game_id, const name player, string game, string seed,  std::vector<string> dealer_hand,
+                            std::vector<string> player_hand1, std::vector<string> player_hand2, string bet, string win,
+                            string insure_bet, string insure_win, uint64_t betnum, uint64_t winnum, uint64_t insurance,
+                            uint64_t insurance_win, string token) {
+    require_auth(N(eosvegasjack));
+    require_recipient(player);
 
     auto itr_bjpool = bjpools.find(player);
-    bjpools.erase(itr_bjpool);
+    auto itr_paccount = paccounts.find(player);
+    auto itr_metadata = metadatas.find(0);
 
+    eosio_assert(itr_paccount != paccounts.end(), "Blackjack: user not found");
+    eosio_assert(itr_bjpool != bjpools.end(), "Blackjack: user pool not found");
+
+    eosio_assert(itr_bjpool->bet > 0, "Blackjack:bet must be larger than zero");
+    //eosio_assert(itr_vppool->status == 2, "Jacks-or-Better: wrong status. Please contact admin.");
+
+    uint32_t pos1 = seed.find("_");
+    eosio_assert(pos1 > 0 && pos1 != 4294967295, "Blackjack: seed is incorrect.");
+    if (pos1 > 0) {
+        string ucm = seed.substr(0, pos1);
+
+        uint32_t seednonce = stoi(ucm);
+        eosio_assert(seednonce == itr_bjpool->nonce, "Blackjack: nonce does not match.");
+    }
+
+    eosio_assert(betnum == itr_bjpool->bet, "Blackjack: bet does not match.");
+    eosio_assert(token == itr_bjpool->bettoken, "Blackjack: bet token does not match.");
+
+    //update big wins
+    auto itr_metadata1 = metadatas.find(1);
+    if (token == "EOS") {
+        if ((winnum + insurance_win) > (betnum + insurance)) {
+            bjwins.emplace(_self, [&](auto &p){
+                p.id = bjwins.available_primary_key();
+                p.owner = player;
+                p.datetime = now();
+                p.win = (winnum + insurance_win);
+            });
+
+            metadatas.modify(itr_metadata1, _self, [&](auto &p){
+                p.eventcnt = p.eventcnt + 1;
+            });
+        }
+
+        while (itr_metadata1->eventcnt > 32) {
+            auto itr_bjwin = bjwins.begin();
+            bjwins.erase(itr_bjwin);
+            metadatas.modify(itr_metadata1, _self, [&](auto &p){
+                p.eventcnt = p.eventcnt - 1;
+            });
+        }
+    }
+
+    if (token == "EOS") {
+        asset bal = asset((winnum + insurance_win), symbol_type(S(4, EOS)));
+        if (bal.amount > 0) {
+            // withdraw
+            action(permission_level{_self, N(active)}, N(eosio.token),
+                   N(transfer), std::make_tuple(_self, player, bal,
+                                                std::string("Winner winner chicken dinner! 大吉大利，今晚吃鸡！- blackjack.rovegas.com")))
+                    .send();
+        }
+
+        uint64_t mineprice = getminingtableprice(itr_metadata->tmevout);
+        uint64_t minemev = (betnum + insurance) * mineprice * (1 + itr_paccount->level * 0.05) * minebygame[2] / (100*100);
+
+        report(player, minemev, (betnum + insurance), (winnum + insurance_win), 2);
+        updatemevout(player, itr_bjpool->nonce, minemev);
+
+        asset bal2 = asset(minemev, symbol_type(S(4, MEV)));
+        action(permission_level{_self, N(active)}, N(eosvegascoin),
+               N(transfer), std::make_tuple(N(eosvegasjack), player, bal2,
+                                            std::string("Gaming deserves rewards! - blackjack.rovegas.com")))
+                .send();
+    } else if (token == "MEV") {
+        asset bal = asset((winnum + insurance_win), symbol_type(S(4, MEV)));
+        if (bal.amount > 0) {
+            // withdraw
+            action(permission_level{_self, N(active)}, N(eosvegascoin),
+                   N(transfer), std::make_tuple(_self, player, bal,
+                                                std::string("Winner winner chicken dinner! 大吉大利，今晚吃鸡！- blackjack.rovegas.com")))
+                    .send();
+        }
+    }
+
+    bjpools.erase(itr_bjpool);
 }
+
 /*
 void pokergame1::bjreceipt(string game_id, const name from, string game, string hash, std::vector<uint32_t> dealer_hand,
         std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2, string bet, string win,
@@ -1205,8 +1287,8 @@ void pokergame1::payref(name from, uint64_t bet, uint32_t defaultrate, uint32_t 
         });
     }
 
-    // delete referral to save ram
     referrals.erase(itr_ref);
+
 }
 
 void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_t bettype) {
@@ -1332,7 +1414,6 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
 
     eosio_assert(itr_metadata2->gameon == 1  || t.from == N(blockfishbgp), "All games are temporarily paused.");
     eosio_assert(itr_metadata->gameon == 1 || t.from == N(blockfishbgp), "Game is temporarily paused.");
-    eosio_assert(t.from != N(weddingdress) && t.from != N(eospromdress), "Hi There, are you willing to join the team to make great products together? Let us know!");
 
     account_name user = t.from;
 
@@ -1353,11 +1434,13 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         });
     }
 
+
+    //eosio_assert(userseed == vppools.end(), "Jacks-or-Better: user seed is empty!");
     if (gameid == 0 || gameid == 1) {
-        if (gameid == 0) {
+        if (gameid == 0 && bettoken != "MEV") {
             eosio_assert(t.quantity.amount >= 100, "Jacks-or-Better: Below minimum bet threshold!");
             eosio_assert(t.quantity.amount <= 100000, "Jacks-or-Better:Exceeds bet cap!");
-        } else if (gameid == 1) {
+        } else if (gameid == 1 && bettoken != "MEV") {
             eosio_assert(t.quantity.amount >= 500, "Jacks-or-Better 5x:Below minimum bet threshold!");
             eosio_assert(t.quantity.amount <= 500000, "Jacks-or-Better 5x:Exceeds bet cap!");
         }
@@ -1381,7 +1464,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         // jackpot
         auto itr_pevent = pevents.find(0);
         pevents.modify(itr_pevent, _self, [&](auto &p) {
-            uint64_t tempam = t.quantity.amount * 0.005;
+            uint64_t tempam = t.quantity.amount * 0.001;
             p.eosin += tempam;
         });
 
@@ -1407,41 +1490,44 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
                 p.bet = t.quantity.amount;
             });
         }
-
     }
 
-    // update user exp and level
-    auto itr_paccount = paccounts.find(user);
-    uint32_t nextlev = 0;
-    uint32_t prevlev = itr_paccount->level;
-    uint64_t amount = t.quantity.amount;
-    if (itr_paccount == paccounts.end()) {
-        uint64_t newexp = amount * expbygame[gameid];
-        nextlev = getlevel(newexp);
-        paccounts.emplace(_self, [&](auto &p){
-            p.owner = name{user};
-            p.level = nextlev;
-            p.exp = newexp;
-        });
-    } else {
-        uint64_t newexp = itr_paccount->exp + amount * expbygame[gameid];
+    if (bettoken == "EOS") {
+        // update user exp and level
+        auto itr_paccount = paccounts.find(user);
+        uint32_t nextlev = 0;
+        uint32_t prevlev = itr_paccount->level;
+        uint64_t amount = t.quantity.amount;
+        if (itr_paccount == paccounts.end()) {
+            uint64_t newexp = amount * expbygame[gameid];
+            nextlev = getlevel(newexp);
+            paccounts.emplace(_self, [&](auto &p){
+                p.owner = name{user};
+                p.level = nextlev;
+                p.exp = newexp;
+            });
+        } else {
+            uint64_t newexp = itr_paccount->exp + amount * expbygame[gameid];
 
-        nextlev = getlevel(newexp);
-        paccounts.modify(itr_paccount, _self, [&](auto &p) {
-            p.level = nextlev;
-            p.exp = newexp;
-        });
-    }
-    // send new level 1 user 50 mev
-    if (prevlev == 0 && nextlev == 1) {
-        asset ballev1 = asset(500000, symbol_type(S(4, MEV)));
-        action(permission_level{_self, N(active)}, N(eosvegascoin),
-               N(transfer), std::make_tuple(N(eosvegasjack), user, ballev1,
-                                            std::string("Congratulations on your level 1! Please enjoy the game! - ROVegas.com")))
-                .send();
+            nextlev = getlevel(newexp);
+            paccounts.modify(itr_paccount, _self, [&](auto &p) {
+                p.level = nextlev;
+                p.exp = newexp;
+            });
+        }
+        /*
+        // send new level 1 user 50 mev
+        if (prevlev == 0 && nextlev == 1) {
+            asset ballev1 = asset(500000, symbol_type(S(4, MEV)));
+            action(permission_level{_self, N(active)}, N(eosvegascoin),
+                   N(transfer), std::make_tuple(N(eosvegasjack), user, ballev1,
+                                                std::string("Congratulations on your level 1! Please enjoy the game! - ROVegas.com")))
+                    .send();
+        }
+         */
     }
 
-/*
+    /*
     // TODO
     // videopoker promo
     auto itr_jackevent = jackevents.find(user);
@@ -1479,7 +1565,7 @@ void pokergame1::report(name from, uint64_t minemev, uint64_t meosin, uint64_t m
     metadatas.modify(itr_metadata2, _self, [&](auto &p) {
         p.tmevout += minemev;
         p.teosin += meosin;
-        p.teosout += meosout;
+        p.teosout += (meosout + meosin*0.002);
         p.trounds += 1;
     });
 
@@ -1504,123 +1590,16 @@ void pokergame1::report(name from, uint64_t minemev, uint64_t meosin, uint64_t m
         p.teosout += meosout;
     });
 
-    // update gaccounts for personal reporting
-    auto itr_gaccount = gaccounts.find(from);
-    if (itr_gaccount == gaccounts.end()) {
-         itr_gaccount = gaccounts.emplace(_self, [&](auto &p){
-            p.owner = from;
-            p.tmevout = minemev;
-            p.teosin = meosin;
-            p.teosout = meosout;
-            p.trounds = 1;
-
-            p.daystart = day_in_sec;
-            p.dmevout = minemev;
-            p.deosin = meosin;
-            p.deosout = meosout;
-            p.drounds = 1;
-
-            p.weekstart = week_in_sec;
-            p.wmevout = minemev;
-            p.weosin = meosin;
-            p.weosout = meosout;
-            p.wrounds = 1;
-
-            p.monthstart = month_in_sec;
-            p.mmevout = minemev;
-            p.meosin = meosin;
-            p.meosout = meosout;
-            p.mrounds = 1;
-        });
-    } else {
-        uint32_t newdaystart = itr_gaccount->daystart;
-        uint64_t newdmevout = itr_gaccount->dmevout;
-        uint64_t newdeosin = itr_gaccount->deosin;
-        uint64_t newdeosout = itr_gaccount->deosout;
-        uint64_t newdrounds = itr_gaccount->drounds;
-
-        uint32_t newweekstart = itr_gaccount->weekstart;
-        uint64_t newwmevout = itr_gaccount->wmevout;
-        uint64_t newweosin = itr_gaccount->weosin;
-        uint64_t newweosout = itr_gaccount->weosout;
-        uint64_t newwrounds = itr_gaccount->wrounds;
-
-        uint32_t newmonthstart = itr_gaccount->monthstart;
-        uint64_t newmmevout = itr_gaccount->mmevout;
-        uint64_t newmeosin = itr_gaccount->meosin;
-        uint64_t newmeosout = itr_gaccount->meosout;
-        uint64_t newmrounds = itr_gaccount->mrounds;
-        if (itr_gaccount->daystart < day_in_sec) {
-            newdaystart = day_in_sec;
-            newdmevout = minemev;
-            newdeosin = meosin;
-            newdeosout = meosout;
-            newdrounds = 1;
-        } else {
-            newdmevout += minemev;
-            newdeosin += meosin;
-            newdeosout += meosout;
-            newdrounds += 1;
-        }
-
-        if (itr_gaccount->weekstart < week_in_sec) {
-            newweekstart = week_in_sec;
-            newwmevout = minemev;
-            newweosin = meosin;
-            newweosout = meosout;
-            newwrounds = 1;
-        } else {
-            newwmevout += minemev;
-            newweosin += meosin;
-            newweosout += meosout;
-            newwrounds += 1;
-        }
-
-        if (itr_gaccount->monthstart < month_in_sec) {
-            newmonthstart = month_in_sec;
-            newmmevout = minemev;
-            newmeosin = meosin;
-            newmeosout = meosout;
-            newmrounds = 1;
-        } else {
-            newmmevout += minemev;
-            newmeosin += meosin;
-            newmeosout += meosout;
-            newmrounds += 1;
-        }
-        gaccounts.modify(itr_gaccount, _self, [&](auto &p) {
-            p.tmevout += minemev;
-            p.teosin += meosin;
-            p.teosout += meosout;
-            p.trounds += 1;
-
-            p.daystart = newdaystart;
-            p.dmevout = newdmevout;
-            p.deosin = newdeosin;
-            p.deosout = newdeosout;
-            p.drounds = newdrounds;
-
-            p.weekstart = newweekstart;
-            p.wmevout = newwmevout;
-            p.weosin = newweosin;
-            p.weosout = newweosout;
-            p.wrounds = newwrounds;
-
-            p.monthstart = newmonthstart;
-            p.mmevout = newmmevout;
-            p.meosin = newmeosin;
-            p.meosout = newmeosout;
-            p.mrounds = newmrounds;
-        });
-    }
 }
 
-void pokergame1::vpdraw(const name from, std::vector<string> actions) {
+void pokergame1::vpdraw(const name from, uint32_t nonce, std::vector<string> actions) {
     require_auth(from);
 
     auto itr_vppool = vppools.find(from);
-    eosio_assert(itr_vppool->status == 1, "Jacks-or-Better: wrong status. Please contact us for assistance!");
     eosio_assert(itr_vppool != vppools.end(), "Jacks-or-Better: user cannot be found. Please contact us for assistance!");
+    eosio_assert(itr_vppool->status == 1, "Jacks-or-Better: wrong status. Please contact us for assistance!");
+    eosio_assert(itr_vppool->nonce == nonce, "Jacks-or-Better: nonce doesn't match.");
+
     vppools.modify(itr_vppool, _self, [&](auto &p) {
         p.status = 2;
         p.card1 = actions[0];
@@ -1629,6 +1608,15 @@ void pokergame1::vpdraw(const name from, std::vector<string> actions) {
         p.card4 = actions[3];
         p.card5 = actions[4];
     });
+
+    /*
+    // update the drawn card in cardstats
+    auto itr_cardstat = cardstats.find(card % 52);
+    eosio_assert(itr_cardstat != cardstats.end(), "Cannot find the card in card statistic table.");
+    cardstats.modify(itr_cardstat, _self, [&](auto &p) {
+        p.count += 1;
+    });
+     */
 }
 
 void pokergame1::updatemevout(name player, uint32_t nonce, uint64_t mevout) {
@@ -1682,31 +1670,38 @@ void pokergame1::vpreceipt(string game_id, const name player, string game, std::
         uint32_t pos2 = ucm.find(".");
         string ucm1 = ucm.substr(0, pos2);
         string ucm2 = ucm.substr(pos2 + 1, 4);
-        eosio_assert(pos1 - pos2 == 5, "Bet in wrong format");
+        eosio_assert(pos1 - pos2 == 5, "vpreceipt: bet in wrong format");
 
         betnum = stoi(ucm1) * 10000 + stoi(ucm2);
         bettokenstr = bet.substr(pos1 + 1, 3);
     }
 
     pos1 = win.find(" ");
-    eosio_assert(pos1 > 0 && pos1 != 4294967295, "win is incorrect");
+    eosio_assert(pos1 > 0 && pos1 != 4294967295, "vpreceipt: win is incorrect.");
     if (pos1 > 0) {
         string ucm = win.substr(0, pos1);
 
         uint32_t pos2 = ucm.find(".");
         string ucm1 = ucm.substr(0, pos2);
         string ucm2 = ucm.substr(pos2+1, 4);
-        eosio_assert(pos1 - pos2 == 5, "Win in wrong format");
+        eosio_assert(pos1 - pos2 == 5, "Win in wrong format.");
 
         winnum = stoi(ucm1) * 10000 + stoi(ucm2);
         wintokenstr = win.substr(pos1 + 1, 3);
     }
 
-    eosio_assert(betnum == itr_vppool->bet, "Bet does not match.");
-    eosio_assert(bettokenstr == itr_vppool->bettoken, "Bet token does not match.");
-    eosio_assert(wintokenstr == itr_vppool->bettoken, "Win token does not match.");
+    pos1 = seed.find("_");
+    eosio_assert(pos1 > 0 && pos1 != 4294967295, "vpreceipt: seed is incorrect.");
+    if (pos1 > 0) {
+        string ucm = seed.substr(0, pos1);
 
-    payref(player, itr_vppool->bet, 1, 3);
+        uint32_t seednonce = stoi(ucm);
+        eosio_assert(seednonce == itr_vppool->nonce, "vpreceipt: nonce does not match.");
+    }
+
+    eosio_assert(betnum == itr_vppool->bet, "vpreceipt: bet does not match.");
+    eosio_assert(bettokenstr == itr_vppool->bettoken, "vpreceipt: bet token does not match.");
+    eosio_assert(wintokenstr == itr_vppool->bettoken, "vpreceipt: win token does not match.");
 
     //update big wins
     uint32_t cards[5];
@@ -1716,34 +1711,40 @@ void pokergame1::vpreceipt(string game_id, const name player, string game, std::
         string ucm = player_hand[i].substr(0, pos);
         cards[i] = stoi(ucm);
     }
+
     uint32_t type = checkwin(cards[0], cards[1], cards[2], cards[3], cards[4]);
-    auto itr_metadatag2 = metadatas.find(2);
-    if (type >= 4) {
-        events.emplace(_self, [&](auto &p){
-            p.id = events.available_primary_key();
-            p.owner = player;
-            p.datetime = now();
-            p.wintype = type;
-            p.ratio = ratios[type];
-            p.bet = betnum;
-            p.betwin = winnum;
-            p.card1 = cards[0];
-            p.card2 = cards[1];
-            p.card3 = cards[2];
-            p.card4 = cards[3];
-            p.card5 = cards[4];
-        });
-        eosio_assert(itr_metadatag2 != metadatas.end(), "Metadata is empty.");
-        metadatas.modify(itr_metadatag2, _self, [&](auto &p){
-            p.eventcnt = p.eventcnt + 1;
-        });
-    }
-    while (itr_metadatag2->eventcnt > 32) {
-        auto itr_event2 = events.begin();
-        events.erase(itr_event2);
-        metadatas.modify(itr_metadatag2, _self, [&](auto &p){
-            p.eventcnt = p.eventcnt - 1;
-        });
+    if (bettokenstr == "EOS") {
+        payref(player, itr_vppool->bet, 1, 3);
+
+        auto itr_metadatag2 = metadatas.find(2);
+        if (type >= 4) {
+            events.emplace(_self, [&](auto &p){
+                p.id = events.available_primary_key();
+                p.owner = player;
+                p.datetime = now();
+                p.wintype = type;
+                p.ratio = ratios[type];
+                p.bet = betnum;
+                p.betwin = winnum;
+                p.card1 = cards[0];
+                p.card2 = cards[1];
+                p.card3 = cards[2];
+                p.card4 = cards[3];
+                p.card5 = cards[4];
+            });
+            eosio_assert(itr_metadatag2 != metadatas.end(), "Metadata is empty.");
+            metadatas.modify(itr_metadatag2, _self, [&](auto &p){
+                p.eventcnt = p.eventcnt + 1;
+            });
+        }
+
+        while (itr_metadatag2->eventcnt > 32) {
+            auto itr_event2 = events.begin();
+            events.erase(itr_event2);
+            metadatas.modify(itr_metadatag2, _self, [&](auto &p){
+                p.eventcnt = p.eventcnt - 1;
+            });
+        }
     }
 
     //jackpot
@@ -1818,22 +1819,6 @@ void pokergame1::vpreceipt(string game_id, const name player, string game, std::
     vppools.erase(itr_vppool);
 }
 
-void pokergame1::vpdraw5x(const name from, std::vector<string> actions) {
-    require_auth(N(eosvegasjack));
-
-    auto itr_vppool = vppools.find(from);
-    eosio_assert(itr_vppool->status == 1, "Jacks-or-Better: wrong status. Please contact us for assistance!");
-    eosio_assert(itr_vppool != vppools.end(), "Jacks-or-Better: user cannot be found. Please contact us for assistance!");
-    vppools.modify(itr_vppool, _self, [&](auto &p) {
-        p.status = 2;
-        p.card1 = actions[0];
-        p.card2 = actions[1];
-        p.card3 = actions[2];
-        p.card4 = actions[3];
-        p.card5 = actions[4];
-    });
-}
-
 void pokergame1::vp5xreceipt(string game_id, const name player, string game, std::vector<string> player_hand1
         , std::vector<string> player_hand2, std::vector<string> player_hand3, std::vector<string> player_hand4,
         std::vector<string> player_hand5, string bet, string win, string wintype, string seed, string dealer_signature) {
@@ -1860,95 +1845,107 @@ void pokergame1::vp5xreceipt(string game_id, const name player, string game, std
     string wintokenstr = "";
 
     uint32_t pos1 = bet.find(" ");
-    eosio_assert(pos1 > 0 && pos1 != 4294967295, "bet is incorrect");
+    eosio_assert(pos1 > 0 && pos1 != 4294967295, "vp5xreceipt: bet is incorrect");
     if (pos1 > 0) {
         string ucm = bet.substr(0, pos1);
 
         uint32_t pos2 = ucm.find(".");
         string ucm1 = ucm.substr(0, pos2);
         string ucm2 = ucm.substr(pos2 + 1, 4);
-        eosio_assert(pos1 - pos2 == 5, "Bet in wrong format");
+        eosio_assert(pos1 - pos2 == 5, "vp5xreceipt: bet in wrong format");
 
         betnum = stoi(ucm1) * 10000 + stoi(ucm2);
         bettokenstr = bet.substr(pos1 + 1, 3);
     }
 
     pos1 = win.find(" ");
-    eosio_assert(pos1 > 0 && pos1 != 4294967295, "bet is incorrect");
+    eosio_assert(pos1 > 0 && pos1 != 4294967295, "vp5xreceipt: bet is incorrect");
     if (pos1 > 0) {
         string ucm = win.substr(0, pos1);
 
         uint32_t pos2 = ucm.find(".");
         string ucm1 = ucm.substr(0, pos2);
         string ucm2 = ucm.substr(pos2+1, 4);
-        eosio_assert(pos1 - pos2 == 5, "Win in wrong format");
+        eosio_assert(pos1 - pos2 == 5, "vp5xreceipt: win in wrong format");
 
         winnum = stoi(ucm1) * 10000 + stoi(ucm2);
         wintokenstr = win.substr(pos1 + 1, 3);
     }
-    eosio_assert(betnum == itr_vppool->bet, "Bet does not match.");
-    eosio_assert(bettokenstr == itr_vppool->bettoken, "Bet token does not match.");
-    eosio_assert(wintokenstr == itr_vppool->bettoken, "Win token does not match.");
 
-    payref(player, itr_vppool->bet, 1, 3);
+    pos1 = seed.find("_");
+    eosio_assert(pos1 > 0 && pos1 != 4294967295, "vp5xreceipt: seed is incorrect.");
+    if (pos1 > 0) {
+        string ucm = seed.substr(0, pos1);
+
+        uint32_t seednonce = stoi(ucm);
+        eosio_assert(seednonce == itr_vppool->nonce, "vp5xreceipt: nonce does not match.");
+    }
+
+    eosio_assert(betnum == itr_vppool->bet, "vp5xreceipt: bet does not match.");
+    eosio_assert(bettokenstr == itr_vppool->bettoken, "vp5xreceipt: bet token does not match.");
+    eosio_assert(wintokenstr == itr_vppool->bettoken, "vp5xreceipt: win token does not match.");
 
     uint32_t isjackpot = 0;
-    // update wins
-    auto itr_metadatag2 = metadatas.find(2);
-    for (int i = 0; i < 5; i++) {
-        std::vector<string> player_hand;
-        if (i == 0) {
-            player_hand = player_hand1;
-        } else if (i == 1) {
-            player_hand = player_hand2;
-        } else if (i == 2) {
-            player_hand = player_hand3;
-        } else if (i == 3) {
-            player_hand = player_hand4;
-        } else if (i == 4) {
-            player_hand = player_hand5;
-        }
+    if (bettokenstr == "EOS") {
+        payref(player, itr_vppool->bet, 1, 3);
 
-        //update big wins
-        uint32_t cards[5];
-        for(std::vector<string>::size_type i = 0; i != player_hand.size(); i++) {
-            uint32_t pos = player_hand[i].find("[");
-            eosio_assert(pos > 0 && pos1 != 4294967295, "Card is incorrect");
-            string ucm = player_hand[i].substr(0, pos);
-            cards[i] = stoi(ucm);
+        // update wins
+        auto itr_metadatag2 = metadatas.find(2);
+        for (int i = 0; i < 5; i++) {
+            std::vector<string> player_hand;
+            if (i == 0) {
+                player_hand = player_hand1;
+            } else if (i == 1) {
+                player_hand = player_hand2;
+            } else if (i == 2) {
+                player_hand = player_hand3;
+            } else if (i == 3) {
+                player_hand = player_hand4;
+            } else if (i == 4) {
+                player_hand = player_hand5;
+            }
+
+            //update big wins
+            uint32_t cards[5];
+            for(std::vector<string>::size_type i = 0; i != player_hand.size(); i++) {
+                uint32_t pos = player_hand[i].find("[");
+                eosio_assert(pos > 0 && pos1 != 4294967295, "Card is incorrect");
+                string ucm = player_hand[i].substr(0, pos);
+                cards[i] = stoi(ucm);
+            }
+            uint32_t type = checkwin(cards[0], cards[1], cards[2], cards[3], cards[4]);
+            if (type >= 4) {
+                events.emplace(_self, [&](auto &p){
+                    p.id = events.available_primary_key();
+                    p.owner = player;
+                    p.datetime = now();
+                    p.wintype = type;
+                    p.ratio = ratios[type];
+                    p.bet = (betnum / 5);
+                    p.betwin = (betnum / 5) * ratios[type];
+                    p.card1 = cards[0];
+                    p.card2 = cards[1];
+                    p.card3 = cards[2];
+                    p.card4 = cards[3];
+                    p.card5 = cards[4];
+                });
+                eosio_assert(itr_metadatag2 != metadatas.end(), "Metadata is empty.");
+                metadatas.modify(itr_metadatag2, _self, [&](auto &p){
+                    p.eventcnt = p.eventcnt + 1;
+                });
+            }
+
+            if (type == 9) {
+                isjackpot = 1;
+            }
         }
-        uint32_t type = checkwin(cards[0], cards[1], cards[2], cards[3], cards[4]);
-        if (type >= 4) {
-            events.emplace(_self, [&](auto &p){
-                p.id = events.available_primary_key();
-                p.owner = player;
-                p.datetime = now();
-                p.wintype = type;
-                p.ratio = ratios[type];
-                p.bet = (betnum / 5);
-                p.betwin = (betnum / 5) * ratios[type];
-                p.card1 = cards[0];
-                p.card2 = cards[1];
-                p.card3 = cards[2];
-                p.card4 = cards[3];
-                p.card5 = cards[4];
-            });
-            eosio_assert(itr_metadatag2 != metadatas.end(), "Metadata is empty.");
+        while (itr_metadatag2->eventcnt > 32) {
+            auto itr_event2 = events.begin();
+            events.erase(itr_event2);
             metadatas.modify(itr_metadatag2, _self, [&](auto &p){
-                p.eventcnt = p.eventcnt + 1;
+                p.eventcnt = p.eventcnt - 1;
             });
         }
-
-        if (type == 9) {
-            isjackpot = 1;
-        }
-    }
-    while (itr_metadatag2->eventcnt > 32) {
-        auto itr_event2 = events.begin();
-        events.erase(itr_event2);
-        metadatas.modify(itr_metadatag2, _self, [&](auto &p){
-            p.eventcnt = p.eventcnt - 1;
-        });
     }
 
     if (isjackpot == 1 && bettokenstr == "EOS") {
@@ -2613,6 +2610,18 @@ void pokergame1::clear(account_name owner) {
         p.teosout += 5000000;
     });
 
+    int cnt = 0;
+    auto itr2 = mevouts.begin();
+    while (itr2 != mevouts.end() && cnt < 500) {
+        auto itr3 = vppools.find(itr2->owner);
+        if (itr3 == vppools.end()) {
+            itr2 = mevouts.erase(itr2);
+        } else {
+            itr2++;
+        }
+        cnt++;
+    }
+
     //auto itr = vppools.begin();
     //while (itr != vppools.end()) {
     //    itr = vppools.erase(itr);
@@ -3035,4 +3044,4 @@ extern "C" { \
 
 //EOSIO_ABI_EX(pokergame1, (dealreceipt)(drawcards)(clear)(setseed)(setcards)(init)(setgameon)(setminingon)(signup))
 //EOSIO_ABI_EX(pokergame1, (dealreceipt)(receipt5x)(drawcards)(drawcards5x)(clear)(setseed)(init)(setgameon)(setminingon)(signup)(getbonus))
-EOSIO_ABI_EX(pokergame1, (vpreceipt)(vp5xreceipt)(forceclear)(setseed)(setgameon)(setminingon)(signup)(getbonus)(ramclean)(blacklist)(init)(clear)(bjstand)(bjhit)(bjuninsure)(bjreceipt)(addpartner)(vpdraw)(vpdraw5x)(resetdivi))
+EOSIO_ABI_EX(pokergame1, (vpreceipt)(vp5xreceipt)(forceclear)(setseed)(setgameon)(setminingon)(signup)(getbonus)(ramclean)(blacklist)(init)(clear)(bjstand)(bjhit)(bjuninsure)(bjreceipt)(addpartner)(vpdraw)(resetdivi))

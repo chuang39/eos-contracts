@@ -44,12 +44,10 @@ public:
              events(_self, _self),
              metadatas(_self, _self),
              ginfos(_self, _self),
-             gaccounts(_self, _self),
              cardstats(_self, _self),
              typestats(_self, _self),
              paccounts(_self, _self),
              pool5xs(_self, _self),
-             suaccounts(_self, _self),
              blacklists(_self, _self),
              bjpools(_self, _self),
              pevents(_self, _self),
@@ -107,13 +105,19 @@ public:
 
 
     //@abi action
-    void bjstand(const name player);
+    void bjstand(const name player, std::vector<uint32_t> dealer_hand,
+                 std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2);
     //@abi action
-    void bjhit(const name player);
+    void bjhit(const name player, std::vector<uint32_t> dealer_hand,
+               std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2);
     //@abi action
-    void bjuninsure(const name player);
+    void bjuninsure(const name player, std::vector<uint32_t> dealer_hand,
+                    std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2);
     //@abi action
-    void bjreceipt(string game_id, const name from, string game);
+    void bjreceipt(string game_id, const name player, string game, string seed,  std::vector<string> dealer_hand,
+                   std::vector<string> player_hand1, std::vector<string> player_hand2, string bet, string win,
+                   string insure_bet, string insure_win, uint64_t betnum, uint64_t winnum, uint64_t insurance,
+                   uint64_t insurance_win, string token);
 
     //@abi action
     void addpartner(const account_name partner, uint32_t rate);
@@ -143,9 +147,7 @@ public:
     void payref(name from, uint64_t bet, uint32_t defaultrate, uint32_t multiplier);
 
     //@abi action
-    void vpdraw(const name from, std::vector<string> actions);
-    //@abi action
-    void vpdraw5x(const name from, std::vector<string> actions);
+    void vpdraw(const name from, uint32_t nonce, std::vector<string> actions);
 
     //@abi action
     void setpubkey(string public_key);
@@ -312,15 +314,6 @@ private:
         EOSLIB_SERIALIZE(st_paccounts, (owner)(level)(exp)(lastbonus)(lastseen)(logins)(bonusnumber)(bonustype))
     };
 
-    // @abi table suaccounts i64
-    struct st_suaccounts {
-        name owner;
-
-        uint64_t primary_key() const { return owner; }
-
-        EOSLIB_SERIALIZE(st_suaccounts, (owner))
-    };
-
     struct st_blacklists {
         name owner;
 
@@ -358,34 +351,6 @@ private:
 
         uint64_t primary_key() const { return startmonth; }
         EOSLIB_SERIALIZE(st_ginfos, (startmonth)(tmevout)(teosin)(teosout))
-    };
-
-    // @abi table gaccounts i64
-    struct st_gaccounts {
-        name owner;
-        uint64_t trounds;
-        uint64_t tmevout;
-        uint64_t teosin;
-        uint64_t teosout;
-        uint32_t daystart;
-        uint64_t drounds;
-        uint64_t dmevout;
-        uint64_t deosin;
-        uint64_t deosout;
-        uint32_t weekstart;
-        uint64_t wrounds;
-        uint64_t wmevout;
-        uint64_t weosin;
-        uint64_t weosout;
-        uint32_t monthstart;
-        uint64_t mrounds;
-        uint64_t mmevout;
-        uint64_t meosin;
-        uint64_t meosout;
-
-        uint64_t primary_key() const { return owner; }
-
-        EOSLIB_SERIALIZE(st_gaccounts, (owner)(trounds)(tmevout)(teosin)(teosout)(daystart)(drounds)(dmevout)(deosin)(deosout)(weekstart)(wrounds)(wmevout)(weosin)(weosout)(monthstart)(mrounds)(mmevout)(meosin)(meosout))
     };
 
     // @abi table cardstats i64
@@ -504,8 +469,6 @@ private:
     _tb_events events;
     typedef multi_index<N(ginfos), st_ginfos> _tb_ginfos;
     _tb_ginfos ginfos;
-    typedef multi_index<N(gaccounts), st_gaccounts> _tb_gaccounts;
-    _tb_gaccounts gaccounts;
     typedef multi_index<N(cardstats), st_cardstats> _tb_cardstats;
     _tb_cardstats cardstats;
     typedef multi_index<N(typestats), st_typestats> _tb_typestats;
@@ -513,8 +476,6 @@ private:
     typedef multi_index<N(paccounts), st_paccounts> _tb_paccounts;
     _tb_paccounts paccounts;
 
-    typedef multi_index<N(suaccounts), st_suaccounts> _tb_suaccounts;
-    _tb_suaccounts suaccounts;
     typedef multi_index<N(blacklists), st_blacklists> _tb_blacklists;
     _tb_blacklists blacklists;
 
