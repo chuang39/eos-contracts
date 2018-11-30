@@ -922,17 +922,18 @@ bool isBlackjack(uint32_t c1, uint32_t c2) {
     return false;
 }
 
-void pokergame1::bjhit(const name player, std::vector<uint32_t> dealer_hand,
+void pokergame1::bjhit(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
         std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2) {}
-void pokergame1::bjuninsure(const name player, std::vector<uint32_t> dealer_hand,
+void pokergame1::bjuninsure(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
         std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2) {}
-void pokergame1::bjstand(const name player, std::vector<uint32_t> dealer_hand,
+void pokergame1::bjstand(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
         std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2) {}
 
 void pokergame1::bjreceipt(string game_id, const name player, string game, string seed,  std::vector<string> dealer_hand,
                             std::vector<string> player_hand1, std::vector<string> player_hand2, string bet, string win,
                             string insure_bet, string insure_win, uint64_t betnum, uint64_t winnum, uint64_t insurance,
                             uint64_t insurance_win, string token) {
+
     require_auth(N(eosvegasjack));
     require_recipient(player);
 
@@ -1000,10 +1001,12 @@ void pokergame1::bjreceipt(string game_id, const name player, string game, strin
         updatemevout(player, itr_bjpool->nonce, minemev);
 
         asset bal2 = asset(minemev, symbol_type(S(4, MEV)));
-        action(permission_level{_self, N(active)}, N(eosvegascoin),
-               N(transfer), std::make_tuple(N(eosvegasjack), player, bal2,
-                                            std::string("Gaming deserves rewards! - blackjack.rovegas.com")))
-                .send();
+        if (bal2.amount > 0) {
+            action(permission_level{_self, N(active)}, N(eosvegascoin),
+                   N(transfer), std::make_tuple(N(eosvegasjack), player, bal2,
+                                                std::string("Gaming deserves rewards! - blackjack.rovegas.com")))
+                    .send();
+        }
     } else if (token == "MEV") {
         asset bal = asset((winnum + insurance_win), symbol_type(S(4, MEV)));
         if (bal.amount > 0) {
@@ -1350,6 +1353,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
             userseed = usercomment.substr(seedidx + 5, pos - seedidx - 5);
         }
     }
+    eosio_assert(userseed.length() > 0, "user seed cannot by empty.");
 
     // detect referral
     uint32_t refidx = usercomment.find("ref[");
@@ -1469,12 +1473,38 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         });
 
     } else if (gameid == 2) {
-        // TODO: add cap
+        uint32_t actionid = 0;
+        uint32_t actionidx = usercomment.find("action[");
+        if (actionidx > 0 && actionidx != 4294967295) {
+            uint32_t actionpos = usercomment.find("]", actionidx);
+            if (actionpos > 0 && actionpos != 4294967295) {
+                string ucmaction = usercomment.substr(actionidx + 7, actionpos - actionidx - 7);
+
+                actionid = stoi(ucmaction);
+            }
+        }
+
+        eosio_assert(actionid == 1 || actionid == 2 || actionid == 3, "Blackjack: invalid action id.");
+        uint32_t bjstatus = 0;
         auto itr_bjpool = bjpools.find(user);
+        if (itr_bjpool == bjpools.end()) {
+            eosio_assert(actionid == 1, "Blackjack: deposit first");
+        } else {
+            eosio_assert(actionid != 1, "Blackjack: existing round is not finished");
+        }
+
+        if (actionid == 2) {
+            bjstatus = 2;   // insurance status
+        } else if (actionid == 3) {
+            bjstatus = 1;   // double so that status is done.
+        }
+
+        // TODO: add cap
+
         if (itr_bjpool == bjpools.end()) {
             bjpools.emplace(_self, [&](auto &p) {
                 p.owner = name{user};
-                p.status = 1;
+                p.status = bjstatus;
                 p.nonce = nonce;
                 p.seed = userseed;
                 p.bettoken = bettoken;
@@ -1483,7 +1513,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         } else {
             bjpools.modify(itr_bjpool, _self, [&](auto &p) {
                 p.owner = name{user};
-                p.status = 1;
+                p.status = bjstatus;
                 p.nonce = nonce;
                 p.seed = userseed;
                 p.bettoken = bettoken;
@@ -1801,10 +1831,12 @@ void pokergame1::vpreceipt(string game_id, const name player, string game, std::
         updatemevout(player, itr_vppool->nonce, minemev);
 
         asset bal2 = asset(minemev, symbol_type(S(4, MEV)));
-        action(permission_level{_self, N(active)}, N(eosvegascoin),
-               N(transfer), std::make_tuple(N(eosvegasjack), player, bal2,
-                                            std::string("Gaming deserves rewards! - jacks.rovegas.com")))
-                .send();
+        if (bal2.amount > 0) {
+            action(permission_level{_self, N(active)}, N(eosvegascoin),
+                   N(transfer), std::make_tuple(N(eosvegasjack), player, bal2,
+                                                std::string("Gaming deserves rewards! - jacks.rovegas.com")))
+                    .send();
+        }
     } else if (bettokenstr == "MEV") {
         asset bal = asset(winnum, symbol_type(S(4, MEV)));
         if (bal.amount > 0) {
@@ -1997,10 +2029,12 @@ void pokergame1::vp5xreceipt(string game_id, const name player, string game, std
         updatemevout(player, itr_vppool->nonce, minemev);
 
         asset bal2 = asset(minemev, symbol_type(S(4, MEV)));
-        action(permission_level{_self, N(active)}, N(eosvegascoin),
-               N(transfer), std::make_tuple(N(eosvegasjack), player, bal2,
-                                            std::string("Gaming deserves rewards! - jacks.rovegas.com")))
-                .send();
+        if (bal2.amount > 0) {
+            action(permission_level{_self, N(active)}, N(eosvegascoin),
+                   N(transfer), std::make_tuple(N(eosvegasjack), player, bal2,
+                                                std::string("Gaming deserves rewards! - jacks.rovegas.com")))
+                    .send();
+        }
     } else if (bettokenstr == "MEV") {
         asset bal = asset(winnum, symbol_type(S(4, MEV)));
         if (bal.amount > 0) {
@@ -2604,12 +2638,12 @@ void pokergame1::clear(account_name owner) {
 
     require_auth(_self);
     print("=====");
-
+/*
     auto itr = metadatas.find(0);
     metadatas.modify(itr, _self, [&](auto &p) {
         p.teosout += 5000000;
     });
-
+*/
     int cnt = 0;
     auto itr2 = mevouts.begin();
     while (itr2 != mevouts.end() && cnt < 500) {
@@ -2985,6 +3019,15 @@ void pokergame1::forceclear(const name from) {
     }
 }
 
+void pokergame1::bjclear(const name from) {
+    require_auth(N(eosvegasjack));
+
+    auto itr = bjpools.find(from);
+    if (itr != bjpools.end()) {
+        bjpools.erase(itr);
+    }
+}
+
 void pokergame1::setpubkey(string public_key) {
     require_auth(N(eosvegasjack));
 }
@@ -3044,4 +3087,4 @@ extern "C" { \
 
 //EOSIO_ABI_EX(pokergame1, (dealreceipt)(drawcards)(clear)(setseed)(setcards)(init)(setgameon)(setminingon)(signup))
 //EOSIO_ABI_EX(pokergame1, (dealreceipt)(receipt5x)(drawcards)(drawcards5x)(clear)(setseed)(init)(setgameon)(setminingon)(signup)(getbonus))
-EOSIO_ABI_EX(pokergame1, (vpreceipt)(vp5xreceipt)(forceclear)(setseed)(setgameon)(setminingon)(signup)(getbonus)(ramclean)(blacklist)(init)(clear)(bjstand)(bjhit)(bjuninsure)(bjreceipt)(addpartner)(vpdraw)(resetdivi))
+EOSIO_ABI_EX(pokergame1, (vpreceipt)(vp5xreceipt)(forceclear)(bjclear)(setseed)(setgameon)(setminingon)(signup)(getbonus)(ramclean)(blacklist)(init)(clear)(bjstand)(bjhit)(bjuninsure)(bjreceipt)(addpartner)(vpdraw)(resetdivi))
