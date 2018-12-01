@@ -1571,13 +1571,19 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
 
             if (actionid == 2) {
                 bjstatus = 2;   // insurance status
+
+                eosio_assert((itr_bjpool->bet / 2) == t.quantity.amount, "Blackjack: insurance must be half of wager.");
                 bjpools.modify(itr_bjpool, _self, [&](auto &p){
                     p.actions = p.actions + "I";
+                    p.insurance = t.quantity.amount;
                 });
             } else if (actionid == 3) {
                 bjstatus = 1;   // double so that status is done.
+
+                eosio_assert(itr_bjpool->bet == t.quantity.amount, "Blackjack: double must deposit the same amount as wager");
                 bjpools.modify(itr_bjpool, _self, [&](auto &p){
                     p.actions = p.actions + "D";
+                    p.bet = (p.bet * 2);
                 });
             }
 

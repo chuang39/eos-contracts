@@ -272,14 +272,14 @@ private:
         uint64_t pcards2;
         uint32_t pcnt2;
         uint64_t bet;
-        uint64_t betwin;
+        uint64_t insurance;
         string bettoken;
         string seed;
         string actions;
 
         uint64_t primary_key() const { return owner; }
 
-        EOSLIB_SERIALIZE(st_bjpools, (owner)(status)(nonce)(dcards)(dcnt)(pcards1)(pcnt1)(pcards2)(pcnt2)(bet)(betwin)(bettoken)(seed)(actions))
+        EOSLIB_SERIALIZE(st_bjpools, (owner)(status)(nonce)(dcards)(dcnt)(pcards1)(pcnt1)(pcards2)(pcnt2)(bet)(insurance)(bettoken)(seed)(actions))
     };
 
     // @abi table bjwins i64
