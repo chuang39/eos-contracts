@@ -59,6 +59,7 @@ public:
              bjevents(_self, _self),
              jackevents(_self, _self),
              nonces(_self, _self),
+             bjnonces(_self, _self),
              vppools(_self, _self),
              pubkeys(_self, _self),
              prefs(_self, _self),
@@ -107,6 +108,7 @@ public:
     void bjclear(const name from);
 
     uint32_t increment_nonce(const name user);
+    uint32_t increment_bjnonce(const name user);
 
     //@abi action
     void bjstand(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
@@ -184,6 +186,15 @@ private:
 
         uint64_t primary_key() const { return owner; }
         EOSLIB_SERIALIZE(st_nonces, (owner)(number))
+    };
+
+    // @abi table bjnonces i64
+    struct st_bjnonces {
+        name owner;
+        uint32_t number;
+
+        uint64_t primary_key() const { return owner; }
+        EOSLIB_SERIALIZE(st_bjnonces, (owner)(number))
     };
 
     // @abi table vppools i64
@@ -515,6 +526,8 @@ private:
     _tb_vppools vppools;
     typedef multi_index<N(nonces), st_nonces> _tb_nonces;
     _tb_nonces nonces;
+    typedef multi_index<N(bjnonces), st_bjnonces> _tb_bjnonces;
+    _tb_bjnonces bjnonces;
 
     typedef multi_index<N(pubkeys), st_pubkeys> _tb_pubkeys;
     _tb_pubkeys pubkeys;

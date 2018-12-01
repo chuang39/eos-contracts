@@ -1348,6 +1348,26 @@ uint32_t pokergame1::increment_nonce(const name user) {
     return nonce;
 }
 
+uint32_t pokergame1::increment_bjnonce(const name user) {
+    // Get current nonce and increment it
+    uint32_t bjnonce =  0;
+    auto itr_bjnonce = bjnonces.find(user);
+    if (itr_bjnonce != bjnonces.end()) {
+        bjnonce = itr_bjnonce->number;
+    }
+    if (itr_bjnonce == bjnonces.end()) {
+        bjnonces.emplace(_self, [&](auto &p) {
+            p.owner = name{user};
+            p.number = 1;
+        });
+    } else {
+        bjnonces.modify(itr_bjnonce, _self, [&](auto &p) {
+            p.number += 1;
+        });
+    }
+    return bjnonce;
+}
+
 void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_t bettype) {
     // run sanity check here
     if (code == _self) {
@@ -1462,7 +1482,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         }
     }
 
-    eosio_assert((gameid == 0 || gameid == 1 || gameid == 2), "Non-recognized game id");
+    eosio_assert((gameid == 0 || gameid == 1 || gameid == 2 || gameid == 88), "Non-recognized game id");
     // metadatas[1] is blackjack, metadatas[2] is video poker.
     auto itr_metadata = gameid == 2 ? metadatas.find(1) : metadatas.find(2);
     auto itr_metadata2 = metadatas.find(0);
@@ -1534,7 +1554,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
             eosio_assert(userseed.length() > 0, "user seed cannot by empty.");
             eosio_assert(actionid == 1, "Blackjack: deposit first");
 
-            uint32_t nonce = increment_nonce(name{user});
+            uint32_t nonce = increment_bjnonce(name{user});
 
             if (itr_bjpool == bjpools.end()) {
                 bjpools.emplace(_self, [&](auto &p) {
@@ -1591,6 +1611,18 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
                 p.status = bjstatus;
             });
         }
+    } else if (gameid == 88) {
+        if (bettoken == "EOS" && t.quantity.amount <= 10000) {
+            asset bal = asset(t.quantity.amount, symbol_type(S(4, EOS)));
+            if (bal.amount > 0) {
+                // withdraw
+                action(permission_level{_self, N(active)}, N(eosio.token),
+                       N(transfer), std::make_tuple(_self, user, bal,
+                                                    std::string("www.rovegas.com")))
+                        .send();
+            }
+        }
+        return;
     }
 
     if (bettoken == "EOS") {
