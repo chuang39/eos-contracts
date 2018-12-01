@@ -20,7 +20,7 @@ uint32_t bjvalues[13] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10};
 
 // experience multiplier by game
 uint32_t expbygame[3] = {50, 50, 12};
-uint32_t minebygame[3] = {100, 100, 25};      // xN/100
+uint32_t minebygame[3] = {100, 100, 50};      // xN/100
 
 
 // check if the player wins or not
@@ -923,11 +923,43 @@ bool isBlackjack(uint32_t c1, uint32_t c2) {
 }
 
 void pokergame1::bjhit(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
-        std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2) {}
+        std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2) {
+    require_recipient(player);
+
+    auto itr_bjpool = bjpools.find(player);
+    eosio_assert(itr_bjpool != bjpools.end(), "Blackjack: user pool not found");
+    eosio_assert(itr_bjpool->nonce == nonce, "Blackjack: nonce does not match");
+
+    bjpools.modify(itr_bjpool, _self, [&](auto &p){
+        p.actions = p.actions + "H";
+    });
+}
+
 void pokergame1::bjuninsure(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
-        std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2) {}
+        std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2) {
+    require_recipient(player);
+
+    auto itr_bjpool = bjpools.find(player);
+    eosio_assert(itr_bjpool != bjpools.end(), "Blackjack: user pool not found");
+    eosio_assert(itr_bjpool->nonce == nonce, "Blackjack: nonce does not match");
+
+    bjpools.modify(itr_bjpool, _self, [&](auto &p){
+        p.actions = p.actions + "U";
+    });
+}
+
 void pokergame1::bjstand(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
-        std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2) {}
+        std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2) {
+    require_recipient(player);
+
+    auto itr_bjpool = bjpools.find(player);
+    eosio_assert(itr_bjpool != bjpools.end(), "Blackjack: user pool not found");
+    eosio_assert(itr_bjpool->nonce == nonce, "Blackjack: nonce does not match");
+
+    bjpools.modify(itr_bjpool, _self, [&](auto &p){
+        p.actions = p.actions + "S";
+    });
+}
 
 void pokergame1::bjreceipt(string game_id, const name player, string game, string seed,  std::vector<string> dealer_hand,
                             std::vector<string> player_hand1, std::vector<string> player_hand2, string bet, string win,
@@ -962,6 +994,8 @@ void pokergame1::bjreceipt(string game_id, const name player, string game, strin
     //update big wins
     auto itr_metadata1 = metadatas.find(1);
     if (token == "EOS") {
+        payref(player, (betnum + insurance), 1, 1);
+
         if ((winnum + insurance_win) > (betnum + insurance)) {
             bjwins.emplace(_self, [&](auto &p){
                 p.id = bjwins.available_primary_key();
@@ -1294,6 +1328,26 @@ void pokergame1::payref(name from, uint64_t bet, uint32_t defaultrate, uint32_t 
 
 }
 
+uint32_t pokergame1::increment_nonce(const name user) {
+    // Get current nonce and increment it
+    uint32_t nonce =  0;
+    auto itr_nonce = nonces.find(user);
+    if (itr_nonce != nonces.end()) {
+        nonce = itr_nonce->number;
+    }
+    if (itr_nonce == nonces.end()) {
+        nonces.emplace(_self, [&](auto &p) {
+            p.owner = name{user};
+            p.number = 1;
+        });
+    } else {
+        nonces.modify(itr_nonce, _self, [&](auto &p) {
+            p.number += 1;
+        });
+    }
+    return nonce;
+}
+
 void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_t bettype) {
     // run sanity check here
     if (code == _self) {
@@ -1353,7 +1407,6 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
             userseed = usercomment.substr(seedidx + 5, pos - seedidx - 5);
         }
     }
-    eosio_assert(userseed.length() > 0, "user seed cannot by empty.");
 
     // detect referral
     uint32_t refidx = usercomment.find("ref[");
@@ -1421,26 +1474,11 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
 
     account_name user = t.from;
 
-    uint32_t nonce =  0;
-    auto itr_nonce = nonces.find(user);
-    if (itr_nonce != nonces.end()) {
-        nonce = itr_nonce->number;
-    }
-    if (itr_nonce == nonces.end()) {
-        nonces.emplace(_self, [&](auto &p) {
-            p.owner = name{user};
-            p.number = 1;
-        });
-    } else {
-        nonces.modify(itr_nonce, _self, [&](auto &p) {
-            p.number += 1;
-
-        });
-    }
-
-
     //eosio_assert(userseed == vppools.end(), "Jacks-or-Better: user seed is empty!");
     if (gameid == 0 || gameid == 1) {
+        eosio_assert(userseed.length() > 0, "user seed cannot by empty.");
+        uint32_t nonce = increment_nonce(name{user});
+
         if (gameid == 0 && bettoken != "MEV") {
             eosio_assert(t.quantity.amount >= 100, "Jacks-or-Better: Below minimum bet threshold!");
             eosio_assert(t.quantity.amount <= 100000, "Jacks-or-Better:Exceeds bet cap!");
@@ -1473,13 +1511,18 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         });
 
     } else if (gameid == 2) {
+        //cap
+        if (bettoken != "MEV") {
+            //eosio_assert(t.quantity.amount >= 100, "Jacks-or-Better: Below minimum bet threshold!");
+            eosio_assert(t.quantity.amount <= 20000, "Blackjack:Exceeds bet cap!");
+        }
+
         uint32_t actionid = 0;
         uint32_t actionidx = usercomment.find("action[");
         if (actionidx > 0 && actionidx != 4294967295) {
             uint32_t actionpos = usercomment.find("]", actionidx);
             if (actionpos > 0 && actionpos != 4294967295) {
                 string ucmaction = usercomment.substr(actionidx + 7, actionpos - actionidx - 7);
-
                 actionid = stoi(ucmaction);
             }
         }
@@ -1488,36 +1531,58 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         uint32_t bjstatus = 0;
         auto itr_bjpool = bjpools.find(user);
         if (itr_bjpool == bjpools.end()) {
+            eosio_assert(userseed.length() > 0, "user seed cannot by empty.");
             eosio_assert(actionid == 1, "Blackjack: deposit first");
+
+            uint32_t nonce = increment_nonce(name{user});
+
+            if (itr_bjpool == bjpools.end()) {
+                bjpools.emplace(_self, [&](auto &p) {
+                    p.owner = name{user};
+                    p.status = bjstatus;
+                    p.nonce = nonce;
+                    p.seed = userseed;
+                    p.bettoken = bettoken;
+                    p.bet = t.quantity.amount;
+                });
+            } else {
+                bjpools.modify(itr_bjpool, _self, [&](auto &p) {
+                    p.owner = name{user};
+                    p.status = bjstatus;
+                    p.nonce = nonce;
+                    p.seed = userseed;
+                    p.bettoken = bettoken;
+                    p.bet = t.quantity.amount;
+                });
+            }
         } else {
             eosio_assert(actionid != 1, "Blackjack: existing round is not finished");
-        }
 
-        if (actionid == 2) {
-            bjstatus = 2;   // insurance status
-        } else if (actionid == 3) {
-            bjstatus = 1;   // double so that status is done.
-        }
+            uint32_t gamenonce = 0;
+            uint32_t nonceidx = usercomment.find("nonce[");
+            if (nonceidx > 0 && nonceidx != 4294967295) {
+                uint32_t noncepos = usercomment.find("]", nonceidx);
+                if (noncepos > 0 && noncepos != 4294967295) {
+                    string ucmaction = usercomment.substr(nonceidx + 6, noncepos - nonceidx - 6);
+                    gamenonce = stoi(ucmaction);
+                }
+            }
+            eosio_assert(itr_bjpool->nonce == gamenonce, "Blackjack: nonce does not match");
 
-        // TODO: add cap
+            if (actionid == 2) {
+                bjstatus = 2;   // insurance status
+                bjpools.modify(itr_bjpool, _self, [&](auto &p){
+                    p.actions = p.actions + "I";
+                });
+            } else if (actionid == 3) {
+                bjstatus = 1;   // double so that status is done.
+                bjpools.modify(itr_bjpool, _self, [&](auto &p){
+                    p.actions = p.actions + "D";
+                });
+            }
 
-        if (itr_bjpool == bjpools.end()) {
-            bjpools.emplace(_self, [&](auto &p) {
-                p.owner = name{user};
-                p.status = bjstatus;
-                p.nonce = nonce;
-                p.seed = userseed;
-                p.bettoken = bettoken;
-                p.bet = t.quantity.amount;
-            });
-        } else {
             bjpools.modify(itr_bjpool, _self, [&](auto &p) {
-                p.owner = name{user};
                 p.status = bjstatus;
-                p.nonce = nonce;
-                p.seed = userseed;
-                p.bettoken = bettoken;
-                p.bet = t.quantity.amount;
             });
         }
     }
@@ -1997,7 +2062,7 @@ void pokergame1::vp5xreceipt(string game_id, const name player, string game, std
                 p.owner = player;
                 p.type = 2;
             });
-        } else if (itr_vppool->bet >= 2500 && itr_vppool->bet < 50000) {
+        } else if (itr_vppool->bet >= 12500 && itr_vppool->bet < 50000) {
             tempam = itr_pevent->eosin * 0.045;
             puevents.emplace(_self, [&](auto &p) {
                 p.id = puevents.available_primary_key();
@@ -2638,12 +2703,12 @@ void pokergame1::clear(account_name owner) {
 
     require_auth(_self);
     print("=====");
-/*
+
     auto itr = metadatas.find(0);
     metadatas.modify(itr, _self, [&](auto &p) {
         p.teosout += 5000000;
     });
-*/
+/*
     int cnt = 0;
     auto itr2 = mevouts.begin();
     while (itr2 != mevouts.end() && cnt < 500) {
@@ -2654,7 +2719,7 @@ void pokergame1::clear(account_name owner) {
             itr2++;
         }
         cnt++;
-    }
+    }*/
 
     //auto itr = vppools.begin();
     //while (itr != vppools.end()) {

@@ -103,15 +103,19 @@ public:
     //@abi action
     void forceclear(const name from);
 
+    //@abi action
+    void bjclear(const name from);
+
+    uint32_t increment_nonce(const name user);
 
     //@abi action
-    void bjstand(const name player, std::vector<uint32_t> dealer_hand,
+    void bjstand(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
                  std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2);
     //@abi action
-    void bjhit(const name player, std::vector<uint32_t> dealer_hand,
+    void bjhit(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
                std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2);
     //@abi action
-    void bjuninsure(const name player, std::vector<uint32_t> dealer_hand,
+    void bjuninsure(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
                     std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2);
     //@abi action
     void bjreceipt(string game_id, const name player, string game, string seed,  std::vector<string> dealer_hand,
@@ -271,10 +275,11 @@ private:
         uint64_t betwin;
         string bettoken;
         string seed;
+        string actions;
 
         uint64_t primary_key() const { return owner; }
 
-        EOSLIB_SERIALIZE(st_bjpools, (owner)(status)(nonce)(dcards)(dcnt)(pcards1)(pcnt1)(pcards2)(pcnt2)(bet)(betwin)(bettoken)(seed))
+        EOSLIB_SERIALIZE(st_bjpools, (owner)(status)(nonce)(dcards)(dcnt)(pcards1)(pcnt1)(pcards2)(pcnt2)(bet)(betwin)(bettoken)(seed)(actions))
     };
 
     // @abi table bjwins i64
