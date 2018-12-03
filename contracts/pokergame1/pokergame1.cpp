@@ -930,6 +930,11 @@ void pokergame1::bjhit(const name player, uint32_t nonce, std::vector<uint32_t> 
     eosio_assert(itr_bjpool != bjpools.end(), "Blackjack: user pool not found");
     eosio_assert(itr_bjpool->nonce == nonce, "Blackjack: nonce does not match");
 
+    uint32_t player1_cnt = player_hand1.size();
+    uint32_t hcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'H');
+    eosio_assert((hcnt + 2) == player1_cnt, "Blackjack: cards don't match for the hit");
+
+
     bjpools.modify(itr_bjpool, _self, [&](auto &p){
         p.actions = p.actions + "H";
     });
@@ -956,6 +961,18 @@ void pokergame1::bjstand(const name player, uint32_t nonce, std::vector<uint32_t
     eosio_assert(itr_bjpool != bjpools.end(), "Blackjack: user pool not found");
     eosio_assert(itr_bjpool->nonce == nonce, "Blackjack: nonce does not match");
 
+
+    uint32_t standcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'S');
+    eosio_assert(standcnt == 0, "Blackjack: action stand has executed");
+
+
+    uint32_t doublecnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'D');
+    eosio_assert(doublecnt == 0, "Blackjack: action stand cannot perform after double");
+
+    uint32_t player1_cnt = player_hand1.size();
+    uint32_t hcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'H');
+    eosio_assert((hcnt + 2) == player1_cnt, "Blackjack: cards don't match for the hit");
+
     bjpools.modify(itr_bjpool, _self, [&](auto &p){
         p.actions = p.actions + "S";
     });
@@ -970,10 +987,8 @@ void pokergame1::bjreceipt(string game_id, const name player, string game, strin
     require_recipient(player);
 
     auto itr_bjpool = bjpools.find(player);
-    auto itr_paccount = paccounts.find(player);
     auto itr_metadata = metadatas.find(0);
 
-    eosio_assert(itr_paccount != paccounts.end(), "Blackjack: user not found");
     eosio_assert(itr_bjpool != bjpools.end(), "Blackjack: user pool not found");
 
     eosio_assert(itr_bjpool->bet > 0, "Blackjack:bet must be larger than zero");
@@ -1019,6 +1034,9 @@ void pokergame1::bjreceipt(string game_id, const name player, string game, strin
     }
 
     if (token == "EOS") {
+        auto itr_paccount = paccounts.find(player);
+        eosio_assert(itr_paccount != paccounts.end(), "Blackjack: user not found");
+
         asset bal = asset((winnum + insurance_win), symbol_type(S(4, EOS)));
         if (bal.amount > 0) {
             // withdraw
@@ -1533,8 +1551,8 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
     } else if (gameid == 2) {
         //cap
         if (bettoken != "MEV") {
-            //eosio_assert(t.quantity.amount >= 100, "Jacks-or-Better: Below minimum bet threshold!");
-            eosio_assert(t.quantity.amount <= 20000, "Blackjack:Exceeds bet cap!");
+            eosio_assert(t.quantity.amount >= 1000, "Blackjack: Below minimum bet threshold!");
+            eosio_assert(t.quantity.amount <= 50000, "Blackjack:Exceeds bet cap!");
         }
 
         uint32_t actionid = 0;
@@ -1780,10 +1798,8 @@ void pokergame1::vpreceipt(string game_id, const name player, string game, std::
     //sanity_check(N(eosvegasjack), N(vpreceipt));
 
     auto itr_vppool = vppools.find(player);
-    auto itr_paccount = paccounts.find(player);
     auto itr_metadata = metadatas.find(0);
 
-    eosio_assert(itr_paccount != paccounts.end(), "Jacks-or-Better:User not found");
     eosio_assert(itr_vppool != vppools.end(), "Jacks-or-Better:User pool not found");
     eosio_assert(itr_vppool->mode == 0, "Jacks-or-Better: wrong game mode");
 
@@ -1918,6 +1934,9 @@ void pokergame1::vpreceipt(string game_id, const name player, string game, std::
     }
 
     if (bettokenstr == "EOS") {
+        auto itr_paccount = paccounts.find(player);
+        eosio_assert(itr_paccount != paccounts.end(), "Jacks-or-Better:User not found");
+
         asset bal = asset(winnum, symbol_type(S(4, EOS)));
         if (bal.amount > 0) {
             // withdraw
@@ -1964,10 +1983,8 @@ void pokergame1::vp5xreceipt(string game_id, const name player, string game, std
     //sanity_check(N(eosvegasjack), N(vpreceipt));
 
     auto itr_vppool = vppools.find(player);
-    auto itr_paccount = paccounts.find(player);
     auto itr_metadata = metadatas.find(0);
 
-    eosio_assert(itr_paccount != paccounts.end(), "Jacks-or-Better:User not found");
     eosio_assert(itr_vppool != vppools.end(), "Jacks-or-Better:User pool not found");
     eosio_assert(itr_vppool->mode == 1, "Jacks-or-Better: wrong game mode");
 
@@ -2116,6 +2133,9 @@ void pokergame1::vp5xreceipt(string game_id, const name player, string game, std
     }
 
     if (bettokenstr == "EOS") {
+        auto itr_paccount = paccounts.find(player);
+        eosio_assert(itr_paccount != paccounts.end(), "Jacks-or-Better:User not found");
+
         asset bal = asset(winnum, symbol_type(S(4, EOS)));
         if (bal.amount > 0) {
             // withdraw
@@ -2825,9 +2845,6 @@ void pokergame1::clear(account_name owner) {
     });
 */
 }
-
-
-
 
 void pokergame1::ramclean() {
     require_auth(_self);
