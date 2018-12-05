@@ -965,6 +965,18 @@ void pokergame1::bjuninsure(const name player, uint32_t nonce, std::vector<uint3
     bjpools.modify(itr_bjpool, _self, [&](auto &p){
         p.actions = p.actions + "U";
     });
+
+    // clear bjmevouts;
+    auto itr_bjmevout = bjmevouts.begin();
+    uint32_t cnt = 0;
+    while (itr_bjmevout != bjmevouts.end() && cnt < 16) {
+        if (itr_bjmevout->lastseen + 3600 < now()) {
+            itr_bjmevout = bjmevouts.erase(itr_bjmevout);
+        } else {
+            itr_bjmevout++;
+        }
+        cnt++;
+    }
 }
 
 void pokergame1::bjstand(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
@@ -1064,7 +1076,7 @@ void pokergame1::bjreceipt(string game_id, const name player, string game, strin
         uint64_t minemev = (betnum + insurance) * mineprice * (1 + itr_paccount->level * 0.05) * minebygame[2] / (100*100);
 
         report(player, minemev, (betnum + insurance), (winnum + insurance_win), 2);
-        updatemevout(player, itr_bjpool->nonce, minemev);
+        updatemevout(player, itr_bjpool->nonce, minemev, 2);
 
         asset bal2 = asset(minemev, symbol_type(S(4, MEV)));
         if (bal2.amount > 0) {
@@ -1574,7 +1586,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
             }
         }
 
-        eosio_assert(actionid == 1 || actionid == 2 || actionid == 3, "Blackjack: invalid action id.");
+        eosio_assert(actionid == 1 || actionid == 2 || actionid == 3 , "Blackjack: invalid action id.");
         uint32_t bjstatus = 0;
         auto itr_bjpool = bjpools.find(user);
         if (itr_bjpool == bjpools.end()) {
@@ -1792,25 +1804,58 @@ void pokergame1::vpdraw(const name from, uint32_t nonce, std::vector<string> act
         p.count += 1;
     });
      */
+
+
+    // clear mevouts;
+    auto itr_mevout = mevouts.begin();
+    uint32_t cnt = 0;
+    while (itr_mevout != mevouts.end() && cnt < 16) {
+        if (itr_mevout->lastseen + 3600 < now()) {
+            itr_mevout = mevouts.erase(itr_mevout);
+        } else {
+            itr_mevout++;
+        }
+        cnt++;
+    }
 }
 
-void pokergame1::updatemevout(name player, uint32_t nonce, uint64_t mevout) {
-    auto itr = mevouts.find(player);
-    if (itr == mevouts.end()) {
-        mevouts.emplace(_self, [&](auto &p){
-            p.owner = player;
-            p.nonce = nonce;
-            p.mevout = mevout;
-            p.lastseen = now();
-        });
-    } else {
-        mevouts.modify(itr, _self, [&](auto &p) {
-            p.owner = player;
-            p.nonce = nonce;
-            p.mevout = mevout;
-            p.lastseen = now();
-        });
+void pokergame1::updatemevout(name player, uint32_t nonce, uint64_t mevout, uint32_t mode) {
+    if (mode == 1) {
+        auto itr = mevouts.find(player);
+        if (itr == mevouts.end()) {
+            mevouts.emplace(_self, [&](auto &p){
+                p.owner = player;
+                p.nonce = nonce;
+                p.mevout = mevout;
+                p.lastseen = now();
+            });
+        } else {
+            mevouts.modify(itr, _self, [&](auto &p) {
+                p.owner = player;
+                p.nonce = nonce;
+                p.mevout = mevout;
+                p.lastseen = now();
+            });
+        }
+    } else if (mode == 2) {
+        auto itr = bjmevouts.find(player);
+        if (itr == bjmevouts.end()) {
+            bjmevouts.emplace(_self, [&](auto &p){
+                p.owner = player;
+                p.nonce = nonce;
+                p.mevout = mevout;
+                p.lastseen = now();
+            });
+        } else {
+            bjmevouts.modify(itr, _self, [&](auto &p) {
+                p.owner = player;
+                p.nonce = nonce;
+                p.mevout = mevout;
+                p.lastseen = now();
+            });
+        }
     }
+
 }
 
 void pokergame1::vpreceipt(string game_id, const name player, string game, std::vector<string> player_hand,
@@ -1974,7 +2019,7 @@ void pokergame1::vpreceipt(string game_id, const name player, string game, std::
         uint64_t minemev = betnum * mineprice * (1 + itr_paccount->level * 0.05) / 100;
 
         report(player, minemev, betnum, winnum, 0);
-        updatemevout(player, itr_vppool->nonce, minemev);
+        updatemevout(player, itr_vppool->nonce, minemev, 1);
 
         asset bal2 = asset(minemev, symbol_type(S(4, MEV)));
         if (bal2.amount > 0) {
@@ -2173,7 +2218,7 @@ void pokergame1::vp5xreceipt(string game_id, const name player, string game, std
         uint64_t minemev = betnum * mineprice * (1 + itr_paccount->level * 0.05) / 100;
 
         report(player, minemev, betnum, winnum, 1); // gameid =1
-        updatemevout(player, itr_vppool->nonce, minemev);
+        updatemevout(player, itr_vppool->nonce, minemev, 1);
 
         asset bal2 = asset(minemev, symbol_type(S(4, MEV)));
         if (bal2.amount > 0) {
