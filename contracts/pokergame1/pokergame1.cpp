@@ -934,6 +934,8 @@ void pokergame1::bjhit(const name player, uint32_t nonce, std::vector<uint32_t> 
     uint32_t hcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'H');
     eosio_assert((hcnt + 2) == player1_cnt, "Blackjack: cards don't match for the hit");
 
+    uint32_t standcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'S');
+    eosio_assert(standcnt == 0, "Blackjack: action hit cannot perform after stand");
 
     bjpools.modify(itr_bjpool, _self, [&](auto &p){
         p.actions = p.actions + "H";
@@ -947,6 +949,18 @@ void pokergame1::bjuninsure(const name player, uint32_t nonce, std::vector<uint3
     auto itr_bjpool = bjpools.find(player);
     eosio_assert(itr_bjpool != bjpools.end(), "Blackjack: user pool not found");
     eosio_assert(itr_bjpool->nonce == nonce, "Blackjack: nonce does not match");
+
+    uint32_t standcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'S');
+    eosio_assert(standcnt == 0, "Blackjack: action uninsure cannot perform after stand");
+
+    uint32_t hitcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'H');
+    eosio_assert(hitcnt == 0, "Blackjack: action uninsure cannot perform after hit");
+
+    uint32_t uninsurecnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'U');
+    eosio_assert(uninsurecnt == 0, "Blackjack: action uninsure cannot perform twice");
+
+    uint32_t insurecnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'I');
+    eosio_assert(insurecnt == 0, "Blackjack: action uninsure cannot perform after insuring");
 
     bjpools.modify(itr_bjpool, _self, [&](auto &p){
         p.actions = p.actions + "U";
@@ -1549,11 +1563,6 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         });
 
     } else if (gameid == 2) {
-        //cap
-        if (bettoken != "MEV") {
-            eosio_assert(t.quantity.amount >= 1000, "Blackjack: Below minimum bet threshold!");
-            eosio_assert(t.quantity.amount <= 50000, "Blackjack:Exceeds bet cap!");
-        }
 
         uint32_t actionid = 0;
         uint32_t actionidx = usercomment.find("action[");
@@ -1571,6 +1580,12 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         if (itr_bjpool == bjpools.end()) {
             eosio_assert(userseed.length() > 0, "user seed cannot by empty.");
             eosio_assert(actionid == 1, "Blackjack: deposit first");
+
+            //cap
+            if (bettoken != "MEV") {
+                eosio_assert(t.quantity.amount >= 1000, "Blackjack: Below minimum bet threshold!");
+                eosio_assert(t.quantity.amount <= 50000, "Blackjack:Exceeds bet cap!");
+            }
 
             uint32_t nonce = increment_bjnonce(name{user});
 
@@ -1610,6 +1625,8 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
             if (actionid == 2) {
                 bjstatus = 2;   // insurance status
 
+                eosio_assert(itr_bjpool->actions.length() == 0, "Blackjack: no action should be performed before action insure");
+
                 eosio_assert((itr_bjpool->bet / 2) == t.quantity.amount, "Blackjack: insurance must be half of wager.");
                 bjpools.modify(itr_bjpool, _self, [&](auto &p){
                     p.actions = p.actions + "I";
@@ -1617,6 +1634,13 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
                 });
             } else if (actionid == 3) {
                 bjstatus = 1;   // double so that status is done.
+
+                uint32_t hitcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'H');
+                eosio_assert(hitcnt == 0, "Blackjack: action double cannot perform after hit");
+                uint32_t doublecnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'D');
+                eosio_assert(doublecnt == 0, "Blackjack: action double cannot perform twice");
+                uint32_t standcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'S');
+                eosio_assert(standcnt == 0, "Blackjack: action double cannot perform after stand");
 
                 eosio_assert(itr_bjpool->bet == t.quantity.amount, "Blackjack: double must deposit the same amount as wager");
                 bjpools.modify(itr_bjpool, _self, [&](auto &p){
