@@ -63,7 +63,8 @@ public:
              vppools(_self, _self),
              pubkeys(_self, _self),
              prefs(_self, _self),
-             mevouts(_self, _self){};
+             mevouts(_self, _self),
+             bjmevouts(_self, _self){};
     //@abi action
     void vpreceipt(string game_id, const name player, string game, std::vector<string> player_hand,
                    string bet, string win, string wintype, string seed, string dealer_signature);
@@ -116,6 +117,21 @@ public:
     //@abi action
     void bjhit(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
                std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2);
+
+    //@abi action
+    void bjstand1(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
+            std::vector<uint32_t> player_hand1);
+    //@abi action
+    void bjhit1(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
+            std::vector<uint32_t> player_hand1);
+    //@abi action
+    void bjstand2(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
+            std::vector<uint32_t> player_hand2);
+    //@abi action
+    void bjhit2(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
+            std::vector<uint32_t> player_hand2);
+
+
     //@abi action
     void bjuninsure(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
                     std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2);
@@ -158,7 +174,7 @@ public:
     //@abi action
     void setpubkey(string public_key);
 
-    void updatemevout(name player, uint32_t nonce, uint64_t mevout);
+    void updatemevout(name player, uint32_t nonce, uint64_t mevout, uint32_t mode);
 
 private:
     // 0: jacks or better
@@ -225,6 +241,17 @@ private:
 
         uint64_t primary_key() const { return owner; }
         EOSLIB_SERIALIZE(st_mevouts, (owner)(nonce)(mevout)(lastseen))
+    };
+
+    // @abi table bjmevouts i64
+    struct st_bjmevouts {
+        name owner;
+        uint32_t nonce;
+        uint64_t mevout;
+        uint64_t lastseen;
+
+        uint64_t primary_key() const { return owner; }
+        EOSLIB_SERIALIZE(st_bjmevouts, (owner)(nonce)(mevout)(lastseen))
     };
 
     // @abi table pools i64
@@ -534,4 +561,6 @@ private:
 
     typedef multi_index<N(mevouts), st_mevouts> _tb_mevouts;
     _tb_mevouts mevouts;
+    typedef multi_index<N(bjmevouts), st_bjmevouts> _tb_bjmevouts;
+    _tb_bjmevouts bjmevouts;
 };

@@ -4,10 +4,10 @@
 
 // (# of mev) = (# of eos) * miningtable[][1] / 100
 uint64_t miningtable[5][2] = {{200000000000, 400}, // 1EOS 4MEV
-                              {200000000000 * 3, 200}, // 1EOS 2MEV
-                               {400000000000 * 3, 100}, // 1EOS 1MEV
-                               {400000000000 * 4, 50}, // 2EOS 1MEV
-                               {400000000000 * 5, 10} // 10EOS 1MEV
+                              {500000000000, 200}, // 1EOS 2MEV
+                               {1000000000000, 100}, // 1EOS 1MEV
+                               {1600000000000, 50}, // 2EOS 1MEV
+                               {2000000000000, 25} // 4EOS 1MEV
                               };
 
 uint64_t exptable[15] = {500000, 3000000, 9000000, 21000000, 61000000, 208500000, 654500000, 1783000000, 4279500000,
@@ -42,7 +42,8 @@ uint32_t getlevel(uint64_t totalexp) {
 uint64_t getminingtableprice(uint64_t sold_keys) {
     for (int i = 0; i < 5; i++) {
         if (sold_keys < miningtable[i][0]) {
-            return miningtable[i][1];
+            uint32_t base = miningtable[i][1];
+            return ((float)(miningtable[i][0] - sold_keys) / (float)(miningtable[i][0] - miningtable[i-1][0])) * (base - miningtable[i+1][1]) + miningtable[i+1][1];
         }
     }
     return 5;
@@ -922,26 +923,6 @@ bool isBlackjack(uint32_t c1, uint32_t c2) {
     return false;
 }
 
-void pokergame1::bjhit(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
-        std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2) {
-    require_recipient(player);
-
-    auto itr_bjpool = bjpools.find(player);
-    eosio_assert(itr_bjpool != bjpools.end(), "Blackjack: user pool not found");
-    eosio_assert(itr_bjpool->nonce == nonce, "Blackjack: nonce does not match");
-
-    uint32_t player1_cnt = player_hand1.size();
-    uint32_t hcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'H');
-    eosio_assert((hcnt + 2) == player1_cnt, "Blackjack: cards don't match for the hit");
-
-    uint32_t standcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'S');
-    eosio_assert(standcnt == 0, "Blackjack: action hit cannot perform after stand");
-
-    bjpools.modify(itr_bjpool, _self, [&](auto &p){
-        p.actions = p.actions + "H";
-    });
-}
-
 void pokergame1::bjuninsure(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
         std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2) {
     require_recipient(player);
@@ -979,6 +960,27 @@ void pokergame1::bjuninsure(const name player, uint32_t nonce, std::vector<uint3
     }
 }
 
+void pokergame1::bjhit(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
+                       std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2) {
+    require_recipient(player);
+
+    auto itr_bjpool = bjpools.find(player);
+    eosio_assert(itr_bjpool != bjpools.end(), "Blackjack: user pool not found");
+    eosio_assert(itr_bjpool->nonce == nonce, "Blackjack: nonce does not match");
+
+    uint32_t player1_cnt = player_hand1.size();
+    uint32_t hcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'H');
+    eosio_assert((hcnt + 2) == player1_cnt, "Blackjack: cards don't match for the hit");
+    uint32_t standcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'S');
+    eosio_assert(standcnt == 0, "Blackjack: action hit cannot perform after stand");
+    uint32_t splitcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'Y');
+    eosio_assert(splitcnt == 0, "Blackjack: action stand cannot perform after split");
+
+    bjpools.modify(itr_bjpool, _self, [&](auto &p){
+        p.actions = p.actions + "H";
+    });
+}
+
 void pokergame1::bjstand(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
         std::vector<uint32_t> player_hand1, std::vector<uint32_t> player_hand2) {
     require_recipient(player);
@@ -990,10 +992,10 @@ void pokergame1::bjstand(const name player, uint32_t nonce, std::vector<uint32_t
 
     uint32_t standcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'S');
     eosio_assert(standcnt == 0, "Blackjack: action stand has executed");
-
-
     uint32_t doublecnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'D');
     eosio_assert(doublecnt == 0, "Blackjack: action stand cannot perform after double");
+    uint32_t splitcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'Y');
+    eosio_assert(splitcnt == 0, "Blackjack: action stand cannot perform after split");
 
     uint32_t player1_cnt = player_hand1.size();
     uint32_t hcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'H');
@@ -1001,6 +1003,101 @@ void pokergame1::bjstand(const name player, uint32_t nonce, std::vector<uint32_t
 
     bjpools.modify(itr_bjpool, _self, [&](auto &p){
         p.actions = p.actions + "S";
+    });
+}
+
+// hand1: hit-Q, stand-W; hand2: hit-E, stand-R
+void pokergame1::bjhit1(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
+                       std::vector<uint32_t> player_hand1) {
+    require_recipient(player);
+
+    auto itr_bjpool = bjpools.find(player);
+    eosio_assert(itr_bjpool != bjpools.end(), "Blackjack: user pool not found");
+    eosio_assert(itr_bjpool->nonce == nonce, "Blackjack: nonce does not match");
+
+    uint32_t player1_cnt = player_hand1.size();
+    uint32_t hcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'Q');
+    eosio_assert((hcnt + 2) == player1_cnt, "Blackjack: cards don't match for the hit1");
+
+    uint32_t splitcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'Y');
+    eosio_assert(splitcnt == 1, "Blackjack: action hit1 must follow split");
+    uint32_t hit2cnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'E');
+    eosio_assert(hit2cnt == 0, "Blackjack: action hit1 cannot perform after hit2");
+    uint32_t stand2cnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'R');
+    eosio_assert(stand2cnt == 0, "Blackjack: action hit1 cannot perform after stand2");
+    uint32_t stand1cnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'W');
+    eosio_assert(stand1cnt == 0, "Blackjack: action hit1 cannot perform after stand1");
+
+    bjpools.modify(itr_bjpool, _self, [&](auto &p){
+        p.actions = p.actions + "Q";
+    });
+}
+
+void pokergame1::bjstand1(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
+                         std::vector<uint32_t> player_hand1) {
+    require_recipient(player);
+
+    auto itr_bjpool = bjpools.find(player);
+    eosio_assert(itr_bjpool != bjpools.end(), "Blackjack: user pool not found");
+    eosio_assert(itr_bjpool->nonce == nonce, "Blackjack: nonce does not match");
+
+    uint32_t splitcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'Y');
+    eosio_assert(splitcnt == 1, "Blackjack: action stand1 must follow split");
+
+    uint32_t player1_cnt = player_hand1.size();
+    uint32_t hcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'Q');
+    eosio_assert((hcnt + 2) == player1_cnt, "Blackjack: cards don't match for the hit");
+    uint32_t hit2cnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'E');
+    eosio_assert(hit2cnt == 0, "Blackjack: action stand1 cannot perform after hit2");
+    uint32_t stand2cnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'R');
+    eosio_assert(stand2cnt == 0, "Blackjack: action stand1 cannot perform after stand2");
+
+    bjpools.modify(itr_bjpool, _self, [&](auto &p){
+        p.actions = p.actions + "W";
+    });
+}
+
+void pokergame1::bjhit2(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
+                        std::vector<uint32_t> player_hand2) {
+    require_recipient(player);
+
+    auto itr_bjpool = bjpools.find(player);
+    eosio_assert(itr_bjpool != bjpools.end(), "Blackjack: user pool not found");
+    eosio_assert(itr_bjpool->nonce == nonce, "Blackjack: nonce does not match");
+
+    uint32_t player2_cnt = player_hand2.size();
+    uint32_t hcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'E');
+    eosio_assert((hcnt + 2) == player2_cnt, "Blackjack: cards don't match for the hit2");
+
+    uint32_t splitcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'Y');
+    eosio_assert(splitcnt == 1, "Blackjack: action hit1 must follow split");
+    uint32_t stand2cnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'R');
+    eosio_assert(stand2cnt == 0, "Blackjack: action hit1 cannot perform after stand2");
+
+    bjpools.modify(itr_bjpool, _self, [&](auto &p){
+        p.actions = p.actions + "E";
+    });
+}
+
+void pokergame1::bjstand2(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
+                          std::vector<uint32_t> player_hand2) {
+    require_recipient(player);
+
+    auto itr_bjpool = bjpools.find(player);
+    eosio_assert(itr_bjpool != bjpools.end(), "Blackjack: user pool not found");
+    eosio_assert(itr_bjpool->nonce == nonce, "Blackjack: nonce does not match");
+
+    uint32_t splitcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'Y');
+    eosio_assert(splitcnt == 1, "Blackjack: action stand2 must follow split");
+
+    uint32_t player2_cnt = player_hand2.size();
+    uint32_t hcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'E');
+    eosio_assert((hcnt + 2) == player2_cnt, "Blackjack: cards don't match for the hit");
+    uint32_t stand2cnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'R');
+    eosio_assert(stand2cnt == 0, "Blackjack: action stand2 cannot perform twice");
+
+    bjpools.modify(itr_bjpool, _self, [&](auto &p){
+        p.actions = p.actions + "R";
     });
 }
 
@@ -1586,7 +1683,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
             }
         }
 
-        eosio_assert(actionid == 1 || actionid == 2 || actionid == 3 , "Blackjack: invalid action id.");
+        eosio_assert(actionid == 1 || actionid == 2 || actionid == 3 || actionid == 4, "Blackjack: invalid action id.");
         uint32_t bjstatus = 0;
         auto itr_bjpool = bjpools.find(user);
         if (itr_bjpool == bjpools.end()) {
@@ -1653,12 +1750,43 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
                 eosio_assert(doublecnt == 0, "Blackjack: action double cannot perform twice");
                 uint32_t standcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'S');
                 eosio_assert(standcnt == 0, "Blackjack: action double cannot perform after stand");
+                uint32_t splitcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'Y');
+                eosio_assert(splitcnt == 0, "Blackjack: action stand cannot perform after split");
 
                 eosio_assert(itr_bjpool->bet == t.quantity.amount, "Blackjack: double must deposit the same amount as wager");
                 bjpools.modify(itr_bjpool, _self, [&](auto &p){
                     p.actions = p.actions + "D";
                     p.bet = (p.bet * 2);
                 });
+            } else if (actionid == 4) {
+                bjstatus = 10;   // double so that status is done.
+
+                uint32_t hitcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'H');
+                eosio_assert(hitcnt == 0, "Blackjack: action double cannot perform after hit");
+                uint32_t doublecnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'D');
+                eosio_assert(doublecnt == 0, "Blackjack: action double cannot perform twice");
+                uint32_t standcnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'S');
+                eosio_assert(standcnt == 0, "Blackjack: action double cannot perform after stand");
+
+                eosio_assert(itr_bjpool->bet == t.quantity.amount, "Blackjack: split must deposit the same amount as wager");
+                bjpools.modify(itr_bjpool, _self, [&](auto &p){
+                    p.actions = p.actions + "Y";
+                    p.bet = (p.bet * 2);
+                });
+
+                uint32_t splitidx = usercomment.find("cards[");
+                if (splitidx > 0 && splitidx != 4294967295) {
+                    uint32_t splitpos = usercomment.find("]", splitidx);
+                    if (splitpos > 0 && splitpos != 4294967295) {
+                        uint32_t splitpos = usercomment.find("]", splitidx);
+                        uint32_t commapos = usercomment.find(",", splitidx);
+                        eosio_assert(commapos < splitpos, "Blackjack: invalid format in cards");
+
+                        string card1str = usercomment.substr(splitidx + 6, commapos - splitidx - 6);
+                        string card2str = usercomment.substr(commapos + 1, splitpos - commapos - 1);
+                        eosio_assert( stoi(card1str) % 13 == stoi(card2str) % 13, "Blackjack: two cards must be idential");
+                    }
+                }
             }
 
             bjpools.modify(itr_bjpool, _self, [&](auto &p) {
@@ -2829,7 +2957,7 @@ void pokergame1::resetdivi() {
 void pokergame1::clear(account_name owner) {
 
     require_auth(_self);
-    print("=====");
+    print("=======");
 
     auto itr = metadatas.find(0);
     metadatas.modify(itr, _self, [&](auto &p) {
@@ -3276,4 +3404,4 @@ extern "C" { \
 
 //EOSIO_ABI_EX(pokergame1, (dealreceipt)(drawcards)(clear)(setseed)(setcards)(init)(setgameon)(setminingon)(signup))
 //EOSIO_ABI_EX(pokergame1, (dealreceipt)(receipt5x)(drawcards)(drawcards5x)(clear)(setseed)(init)(setgameon)(setminingon)(signup)(getbonus))
-EOSIO_ABI_EX(pokergame1, (vpreceipt)(vp5xreceipt)(forceclear)(bjclear)(setseed)(setgameon)(setminingon)(signup)(getbonus)(ramclean)(blacklist)(init)(clear)(bjstand)(bjhit)(bjuninsure)(bjreceipt)(addpartner)(vpdraw)(resetdivi))
+EOSIO_ABI_EX(pokergame1, (vpreceipt)(vp5xreceipt)(forceclear)(bjclear)(setseed)(setgameon)(setminingon)(signup)(getbonus)(ramclean)(blacklist)(init)(clear)(bjhit)(bjstand)(bjhit1)(bjstand1)(bjhit2)(bjstand2)(bjuninsure)(bjreceipt)(addpartner)(vpdraw)(resetdivi))
