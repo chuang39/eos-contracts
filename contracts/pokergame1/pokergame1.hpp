@@ -139,7 +139,7 @@ public:
     void bjreceipt(string game_id, const name player, string game, string seed,  std::vector<string> dealer_hand,
                    std::vector<string> player_hand1, std::vector<string> player_hand2, string bet, string win,
                    string insure_bet, string insure_win, uint64_t betnum, uint64_t winnum, uint64_t insurance,
-                   uint64_t insurance_win, string token);
+                   uint64_t insurance_win, string token, string actions);
 
     //@abi action
     void addpartner(const account_name partner, uint32_t rate);
@@ -336,9 +336,10 @@ private:
     struct st_pubkeys {
         uint64_t id;
         string pubkey;
+        uint32_t updatetime;
 
         uint64_t primary_key() const { return id; }
-        EOSLIB_SERIALIZE(st_pubkeys, (id)(pubkey))
+        EOSLIB_SERIALIZE(st_pubkeys, (id)(pubkey)(updatetime))
     };
 
     // @abi table paccounts i64

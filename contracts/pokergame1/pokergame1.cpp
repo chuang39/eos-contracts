@@ -20,7 +20,7 @@ uint32_t bjvalues[13] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10};
 
 // experience multiplier by game
 uint32_t expbygame[3] = {50, 50, 12};
-uint32_t minebygame[3] = {100, 100, 50};      // xN/100
+uint32_t minebygame[3] = {100, 100, 25};      // xN/100
 
 
 // check if the player wins or not
@@ -1104,7 +1104,7 @@ void pokergame1::bjstand2(const name player, uint32_t nonce, std::vector<uint32_
 void pokergame1::bjreceipt(string game_id, const name player, string game, string seed,  std::vector<string> dealer_hand,
                             std::vector<string> player_hand1, std::vector<string> player_hand2, string bet, string win,
                             string insure_bet, string insure_win, uint64_t betnum, uint64_t winnum, uint64_t insurance,
-                            uint64_t insurance_win, string token) {
+                            uint64_t insurance_win, string token, string actions) {
 
     require_auth(N(eosvegasjack));
     require_recipient(player);
@@ -3413,6 +3413,21 @@ void pokergame1::bjclear(const name from) {
 
 void pokergame1::setpubkey(string public_key) {
     require_auth(N(eosvegasjack));
+
+    auto itr = pubkeys.find(0);
+    if (itr == pubkeys.end()) {
+        pubkeys.emplace(_self, [&](auto &p){
+            p.id = pubkeys.available_primary_key();
+            p.pubkey = public_key;
+            p.updatetime = now();
+        });
+    } else {
+        pubkeys.modify(itr, _self, [&](auto &p){
+            p.pubkey = public_key;
+            p.updatetime = now();
+        });
+
+    }
 }
 
 #define EOSIO_ABI_EX( TYPE, MEMBERS ) \
@@ -3470,4 +3485,4 @@ extern "C" { \
 
 //EOSIO_ABI_EX(pokergame1, (dealreceipt)(drawcards)(clear)(setseed)(setcards)(init)(setgameon)(setminingon)(signup))
 //EOSIO_ABI_EX(pokergame1, (dealreceipt)(receipt5x)(drawcards)(drawcards5x)(clear)(setseed)(init)(setgameon)(setminingon)(signup)(getbonus))
-EOSIO_ABI_EX(pokergame1, (vpreceipt)(vp5xreceipt)(forceclear)(bjclear)(setseed)(setgameon)(setminingon)(signup)(getbonus)(ramclean)(blacklist)(init)(clear)(bjhit)(bjstand)(bjhit1)(bjstand1)(bjhit2)(bjstand2)(bjuninsure)(bjreceipt)(addpartner)(vpdraw)(resetdivi))
+EOSIO_ABI_EX(pokergame1, (vpreceipt)(vp5xreceipt)(forceclear)(bjclear)(setseed)(setgameon)(setminingon)(signup)(getbonus)(ramclean)(blacklist)(init)(clear)(bjhit)(bjstand)(bjhit1)(bjstand1)(bjhit2)(bjstand2)(bjuninsure)(bjreceipt)(addpartner)(vpdraw)(resetdivi)(setpubkey))
