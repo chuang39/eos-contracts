@@ -1132,7 +1132,7 @@ void pokergame1::bjreceipt(string game_id, const name player, string game, strin
     //update big wins
     auto itr_metadata1 = metadatas.find(1);
     if (token == "EOS") {
-        payref(player, (betnum + insurance), 1, 1);
+        //payref(player, (betnum + insurance), 1, 1);
 
         if ((winnum + insurance_win) > (betnum + insurance)) {
             bjwins.emplace(_self, [&](auto &p){
@@ -1686,7 +1686,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
             }
         }
 
-        eosio_assert(actionid == 1 || actionid == 2 || actionid == 3 || actionid == 4, "Blackjack: invalid action id.");
+        eosio_assert(actionid == 1 || actionid == 2 || actionid == 3 || actionid == 4 || actionid == 5 || actionid == 6, "Blackjack: invalid action id.");
         uint32_t bjstatus = 0;
         auto itr_bjpool = bjpools.find(user);
         if (itr_bjpool == bjpools.end()) {
@@ -1720,6 +1720,8 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
                     p.bet = t.quantity.amount;
                 });
             }
+
+            payref(name{user}, t.quantity.amount, 1, 1);  // pay ref for deal
         } else {
             eosio_assert(actionid != 1, "Blackjack: existing round is not finished");
 
@@ -1928,7 +1930,7 @@ void pokergame1::report(name from, uint64_t minemev, uint64_t meosin, uint64_t m
     metadatas.modify(itr_metadata, _self, [&](auto &p) {
         p.tmevout += minemev;
         p.teosin += meosin;
-        p.teosout += meosout;
+        p.teosout += (meosout + meosin*0.005);
         p.trounds += 1;
     });
 
