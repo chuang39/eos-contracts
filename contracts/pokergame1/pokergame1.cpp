@@ -1051,6 +1051,8 @@ void pokergame1::bjstand1(const name player, uint32_t nonce, std::vector<uint32_
     eosio_assert(hit2cnt == 0, "Blackjack: action stand1 cannot perform after hit2");
     uint32_t stand2cnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'R');
     eosio_assert(stand2cnt == 0, "Blackjack: action stand1 cannot perform after stand2");
+    uint32_t stand1cnt = std::count(itr_bjpool->actions.begin(), itr_bjpool->actions.end(), 'W');
+    eosio_assert(stand1cnt == 0, "Blackjack: action stand1 cannot perform twice");
 
     bjpools.modify(itr_bjpool, _self, [&](auto &p){
         p.actions = p.actions + "W";
@@ -2126,7 +2128,7 @@ void pokergame1::vpreceipt(string game_id, const name player, string game, std::
 
     uint32_t type = checkwin(cards[0], cards[1], cards[2], cards[3], cards[4]);
     if (bettokenstr == "EOS") {
-        payref(player, itr_vppool->bet, 1, 3);
+        payref(player, itr_vppool->bet, 1, 6);
 
         auto itr_metadatag2 = metadatas.find(2);
         if (type >= 4) {
@@ -2302,7 +2304,7 @@ void pokergame1::vp5xreceipt(string game_id, const name player, string game, std
 
     uint32_t isjackpot = 0;
     if (bettokenstr == "EOS") {
-        payref(player, itr_vppool->bet, 1, 3);
+        payref(player, itr_vppool->bet, 1, 6);
 
         // update wins
         auto itr_metadatag2 = metadatas.find(2);
