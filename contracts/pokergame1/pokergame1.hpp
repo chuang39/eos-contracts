@@ -67,12 +67,13 @@ public:
              bjmevouts(_self, _self){};
     //@abi action
     void vpreceipt(string game_id, const name player, string game, std::vector<string> player_hand,
-                   string bet, string win, string wintype, string seed, string dealer_signature);
+                   string bet, string win, string wintype, string seed, string dealer_signature,
+                   uint64_t betnum, uint64_t winnum, string token);
     //@abi action
     void vp5xreceipt(string game_id, const name player, string game, std::vector<string> player_hand1
             , std::vector<string> player_hand2, std::vector<string> player_hand3, std::vector<string> player_hand4,
             std::vector<string> player_hand5, string bet, string win, string wintype, string seed,
-            string dealer_signature);
+            string dealer_signature, uint64_t betnum, uint64_t winnum, string token);
 
     //@abi action
     void clear(account_name owner);
@@ -100,7 +101,7 @@ public:
     //@abi action
     void blacklist(const name to, uint32_t status);
     //@abi action
-    void init();
+    void init(string text);
 
     //@abi action
     void forceclear(const name from);

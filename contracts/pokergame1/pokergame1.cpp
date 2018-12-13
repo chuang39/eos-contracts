@@ -1115,9 +1115,7 @@ void pokergame1::bjreceipt(string game_id, const name player, string game, strin
     auto itr_metadata = metadatas.find(0);
 
     eosio_assert(itr_bjpool != bjpools.end(), "Blackjack: user pool not found");
-
     eosio_assert(itr_bjpool->bet > 0, "Blackjack:bet must be larger than zero");
-    //eosio_assert(itr_vppool->status == 2, "Jacks-or-Better: wrong status. Please contact admin.");
 
     uint32_t pos1 = seed.find("_");
     eosio_assert(pos1 > 0 && pos1 != 4294967295, "Blackjack: seed is incorrect.");
@@ -1131,6 +1129,7 @@ void pokergame1::bjreceipt(string game_id, const name player, string game, strin
     eosio_assert(betnum == itr_bjpool->bet, "Blackjack: bet does not match.");
     eosio_assert(token == itr_bjpool->bettoken, "Blackjack: bet token does not match.");
 
+    /*
     //update big wins
     auto itr_metadata1 = metadatas.find(1);
     if (token == "EOS") {
@@ -1157,6 +1156,7 @@ void pokergame1::bjreceipt(string game_id, const name player, string game, strin
             });
         }
     }
+    */
 
     if (token == "EOS") {
         auto itr_paccount = paccounts.find(player);
@@ -1670,13 +1670,16 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
             p.bet = t.quantity.amount;
         });
 
-        // jackpot
-        auto itr_pevent = pevents.find(0);
-        pevents.modify(itr_pevent, _self, [&](auto &p) {
-            uint64_t tempam = t.quantity.amount * 0.001;
-            p.eosin += tempam;
-        });
+        if (bettoken == "EOS") {
+            // jackpot
+            auto itr_pevent = pevents.find(0);
+            pevents.modify(itr_pevent, _self, [&](auto &p) {
+                uint64_t tempam = t.quantity.amount * 0.001;
+                p.eosin += tempam;
+            });
 
+            payref(name{user}, t.quantity.amount, 1, 4);
+        }
     } else if (gameid == 2) {
         uint32_t actionid = 0;
         uint32_t actionidx = usercomment.find("action[");
@@ -1935,7 +1938,7 @@ void pokergame1::report(name from, uint64_t minemev, uint64_t meosin, uint64_t m
         p.teosout += (meosout + meosin*0.005);
         p.trounds += 1;
     });
-
+/*
     uint32_t reportidx = 0;
     if (gameid == 0 || gameid == 1) {
         reportidx = 2;
@@ -1972,7 +1975,7 @@ void pokergame1::report(name from, uint64_t minemev, uint64_t meosin, uint64_t m
         p.teosin += meosin;
         p.teosout += meosout;
     });
-
+*/
 }
 
 void pokergame1::vpdraw(const name from, uint32_t nonce, std::vector<string> actions) {
@@ -2000,7 +2003,6 @@ void pokergame1::vpdraw(const name from, uint32_t nonce, std::vector<string> act
         p.count += 1;
     });
      */
-
 
     // clear mevouts;
     auto itr_mevout = mevouts.begin();
@@ -2055,7 +2057,7 @@ void pokergame1::updatemevout(name player, uint32_t nonce, uint64_t mevout, uint
 }
 
 void pokergame1::vpreceipt(string game_id, const name player, string game, std::vector<string> player_hand,
-        string bet, string win, string wintype, string seed, string dealer_signature) {
+        string bet, string win, string wintype, string seed, string dealer_signature, uint64_t betnum, uint64_t winnum, string token) {
 
     require_auth(N(eosvegasjack));
 
@@ -2071,40 +2073,10 @@ void pokergame1::vpreceipt(string game_id, const name player, string game, std::
     eosio_assert(itr_vppool->bet > 0, "Jacks-or-Better:bet must be larger than zero");
     eosio_assert(itr_vppool->status == 2, "Jacks-or-Better: wrong status. Please contact admin.");
 
-    uint64_t betnum = 0;
-    string bettokenstr = "";
-    uint64_t winnum = 0;
-    string wintokenstr = "";
+    eosio_assert(betnum == itr_vppool->bet, "vpreceipt: bet does not match.");
+    eosio_assert(token == itr_vppool->bettoken, "vpreceipt: bet token does not match.");
 
-    uint32_t pos1 = bet.find(" ");
-    eosio_assert(pos1 > 0 && pos1 != 4294967295, "bet is incorrect");
-    if (pos1 > 0) {
-        string ucm = bet.substr(0, pos1);
-
-        uint32_t pos2 = ucm.find(".");
-        string ucm1 = ucm.substr(0, pos2);
-        string ucm2 = ucm.substr(pos2 + 1, 4);
-        eosio_assert(pos1 - pos2 == 5, "vpreceipt: bet in wrong format");
-
-        betnum = stoi(ucm1) * 10000 + stoi(ucm2);
-        bettokenstr = bet.substr(pos1 + 1, 3);
-    }
-
-    pos1 = win.find(" ");
-    eosio_assert(pos1 > 0 && pos1 != 4294967295, "vpreceipt: win is incorrect.");
-    if (pos1 > 0) {
-        string ucm = win.substr(0, pos1);
-
-        uint32_t pos2 = ucm.find(".");
-        string ucm1 = ucm.substr(0, pos2);
-        string ucm2 = ucm.substr(pos2+1, 4);
-        eosio_assert(pos1 - pos2 == 5, "Win in wrong format.");
-
-        winnum = stoi(ucm1) * 10000 + stoi(ucm2);
-        wintokenstr = win.substr(pos1 + 1, 3);
-    }
-
-    pos1 = seed.find("_");
+    uint32_t pos1 = seed.find("_");
     eosio_assert(pos1 > 0 && pos1 != 4294967295, "vpreceipt: seed is incorrect.");
     if (pos1 > 0) {
         string ucm = seed.substr(0, pos1);
@@ -2113,10 +2085,7 @@ void pokergame1::vpreceipt(string game_id, const name player, string game, std::
         eosio_assert(seednonce == itr_vppool->nonce, "vpreceipt: nonce does not match.");
     }
 
-    eosio_assert(betnum == itr_vppool->bet, "vpreceipt: bet does not match.");
-    eosio_assert(bettokenstr == itr_vppool->bettoken, "vpreceipt: bet token does not match.");
-    eosio_assert(wintokenstr == itr_vppool->bettoken, "vpreceipt: win token does not match.");
-
+    /*
     //update big wins
     uint32_t cards[5];
     for(std::vector<string>::size_type i = 0; i != player_hand.size(); i++) {
@@ -2127,8 +2096,8 @@ void pokergame1::vpreceipt(string game_id, const name player, string game, std::
     }
 
     uint32_t type = checkwin(cards[0], cards[1], cards[2], cards[3], cards[4]);
-    if (bettokenstr == "EOS") {
-        payref(player, itr_vppool->bet, 1, 6);
+    if (token == "EOS") {
+        //payref(player, itr_vppool->bet, 1, 6);
 
         auto itr_metadatag2 = metadatas.find(2);
         if (type >= 4) {
@@ -2160,13 +2129,11 @@ void pokergame1::vpreceipt(string game_id, const name player, string game, std::
             });
         }
     }
+    */
 
     //jackpot
-    uint32_t isjackpot = 0;
-    if (type == 9) {
-        isjackpot = 1;
-    }
-    if (isjackpot == 1 && bettokenstr == "EOS") {
+    int jackpot_idx = wintype.find("X250");
+    if (jackpot_idx >= 0 && token == "EOS") {
         auto itr_pevent = pevents.find(0);
         uint64_t tempam = 0;
         if (itr_vppool->bet >= 50000) {
@@ -2198,7 +2165,7 @@ void pokergame1::vpreceipt(string game_id, const name player, string game, std::
         winnum += tempam;
     }
 
-    if (bettokenstr == "EOS") {
+    if (token == "EOS") {
         auto itr_paccount = paccounts.find(player);
         eosio_assert(itr_paccount != paccounts.end(), "Jacks-or-Better:User not found");
 
@@ -2224,7 +2191,7 @@ void pokergame1::vpreceipt(string game_id, const name player, string game, std::
                                                 std::string("Gaming deserves rewards! - jacks.rovegas.com")))
                     .send();
         }
-    } else if (bettokenstr == "MEV") {
+    } else if (token == "MEV") {
         asset bal = asset(winnum, symbol_type(S(4, MEV)));
         if (bal.amount > 0) {
             // withdraw
@@ -2238,9 +2205,10 @@ void pokergame1::vpreceipt(string game_id, const name player, string game, std::
     vppools.erase(itr_vppool);
 }
 
-void pokergame1::vp5xreceipt(string game_id, const name player, string game, std::vector<string> player_hand1
-        , std::vector<string> player_hand2, std::vector<string> player_hand3, std::vector<string> player_hand4,
-        std::vector<string> player_hand5, string bet, string win, string wintype, string seed, string dealer_signature) {
+void pokergame1::vp5xreceipt(string game_id, const name player, string game, std::vector<string> player_hand1,
+        std::vector<string> player_hand2, std::vector<string> player_hand3, std::vector<string> player_hand4,
+        std::vector<string> player_hand5, string bet, string win, string wintype, string seed, string dealer_signature,
+        uint64_t betnum, uint64_t winnum, string token) {
 
     require_auth(N(eosvegasjack));
 
@@ -2256,40 +2224,7 @@ void pokergame1::vp5xreceipt(string game_id, const name player, string game, std
     eosio_assert(itr_vppool->bet > 0, "Jacks-or-Better:bet must be larger than zero");
     eosio_assert(itr_vppool->status == 2, "Jacks-or-Better: wrong status. Please contact admin.");
 
-    uint64_t betnum = 0;
-    string bettokenstr = "";
-    uint64_t winnum = 0;
-    string wintokenstr = "";
-
-    uint32_t pos1 = bet.find(" ");
-    eosio_assert(pos1 > 0 && pos1 != 4294967295, "vp5xreceipt: bet is incorrect");
-    if (pos1 > 0) {
-        string ucm = bet.substr(0, pos1);
-
-        uint32_t pos2 = ucm.find(".");
-        string ucm1 = ucm.substr(0, pos2);
-        string ucm2 = ucm.substr(pos2 + 1, 4);
-        eosio_assert(pos1 - pos2 == 5, "vp5xreceipt: bet in wrong format");
-
-        betnum = stoi(ucm1) * 10000 + stoi(ucm2);
-        bettokenstr = bet.substr(pos1 + 1, 3);
-    }
-
-    pos1 = win.find(" ");
-    eosio_assert(pos1 > 0 && pos1 != 4294967295, "vp5xreceipt: bet is incorrect");
-    if (pos1 > 0) {
-        string ucm = win.substr(0, pos1);
-
-        uint32_t pos2 = ucm.find(".");
-        string ucm1 = ucm.substr(0, pos2);
-        string ucm2 = ucm.substr(pos2+1, 4);
-        eosio_assert(pos1 - pos2 == 5, "vp5xreceipt: win in wrong format");
-
-        winnum = stoi(ucm1) * 10000 + stoi(ucm2);
-        wintokenstr = win.substr(pos1 + 1, 3);
-    }
-
-    pos1 = seed.find("_");
+    uint32_t pos1 = seed.find("_");
     eosio_assert(pos1 > 0 && pos1 != 4294967295, "vp5xreceipt: seed is incorrect.");
     if (pos1 > 0) {
         string ucm = seed.substr(0, pos1);
@@ -2299,12 +2234,13 @@ void pokergame1::vp5xreceipt(string game_id, const name player, string game, std
     }
 
     eosio_assert(betnum == itr_vppool->bet, "vp5xreceipt: bet does not match.");
-    eosio_assert(bettokenstr == itr_vppool->bettoken, "vp5xreceipt: bet token does not match.");
-    eosio_assert(wintokenstr == itr_vppool->bettoken, "vp5xreceipt: win token does not match.");
+    eosio_assert(token == itr_vppool->bettoken, "vp5xreceipt: bet token does not match.");
 
+    /*
     uint32_t isjackpot = 0;
-    if (bettokenstr == "EOS") {
-        payref(player, itr_vppool->bet, 1, 6);
+    if (token == "EOS") {
+        //payref(player, itr_vppool->bet, 1, 6);
+
 
         // update wins
         auto itr_metadatag2 = metadatas.find(2);
@@ -2364,8 +2300,10 @@ void pokergame1::vp5xreceipt(string game_id, const name player, string game, std
             });
         }
     }
+    */
 
-    if (isjackpot == 1 && bettokenstr == "EOS") {
+    int jackpot_idx = wintype.find("X250");
+    if (jackpot_idx >= 0 && token == "EOS") {
         auto itr_pevent = pevents.find(0);
         uint64_t tempam = 0;
         if (itr_vppool->bet >= 250000) {
@@ -2397,7 +2335,7 @@ void pokergame1::vp5xreceipt(string game_id, const name player, string game, std
         winnum += tempam;
     }
 
-    if (bettokenstr == "EOS") {
+    if (token == "EOS") {
         auto itr_paccount = paccounts.find(player);
         eosio_assert(itr_paccount != paccounts.end(), "Jacks-or-Better:User not found");
 
@@ -2423,7 +2361,7 @@ void pokergame1::vp5xreceipt(string game_id, const name player, string game, std
                                                 std::string("Gaming deserves rewards! - jacks.rovegas.com")))
                     .send();
         }
-    } else if (bettokenstr == "MEV") {
+    } else if (token == "MEV") {
         asset bal = asset(winnum, symbol_type(S(4, MEV)));
         if (bal.amount > 0) {
             // withdraw
@@ -3225,17 +3163,10 @@ for (auto itr = gaccounts.begin();  cnt < ; itr++) {
         });
     }
     */
-}
 
 
-void pokergame1::init() {
+void pokergame1::init(string text) {
     require_auth(_self);
-
-    auto itr = pevents.find(0);
-    pevents.modify(itr, _self, [&](auto &p) {
-        p.eosin = 5000000;
-    });
-
 }
 
 void pokergame1::setgameon(uint64_t id, uint32_t flag) {
