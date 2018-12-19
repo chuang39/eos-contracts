@@ -50,6 +50,7 @@ public:
              pool5xs(_self, _self),
              blacklists(_self, _self),
              bjpools(_self, _self),
+             uthpools(_self, _self),
              pevents(_self, _self),
              puevents(_self, _self),
              bjwins(_self, _self),
@@ -61,6 +62,7 @@ public:
              nonces(_self, _self),
              bjnonces(_self, _self),
              vppools(_self, _self),
+             uthnonces(_self, _self),
              pubkeys(_self, _self),
              prefs(_self, _self),
              mevouts(_self, _self),
@@ -108,9 +110,12 @@ public:
 
     //@abi action
     void bjclear(const name from);
+    //@abi action
+    void uthclear(const name from);
 
     uint32_t increment_nonce(const name user);
     uint32_t increment_bjnonce(const name user);
+    uint32_t increment_uthnonce(const name user);
 
     //@abi action
     void bjstand(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
@@ -142,6 +147,17 @@ public:
                    string insure_bet, string insure_win, uint64_t betnum, uint64_t winnum, uint64_t insurance,
                    uint64_t insurance_win, string token, string actions);
 
+
+    //@abi action
+    void uthcheck(const name player, uint32_t nonce, std::vector<uint32_t> common_hand, std::vector<uint32_t> player_hand, uint32_t cur_status);
+    //@abi action
+    void uthfold(const name player, uint32_t nonce, std::vector<uint32_t> common_hand, std::vector<uint32_t> player_hand);
+    //@abi action
+    void uthreceipt(string game_id, const name player, string game, string seed, std::vector<string> dealer_hand,
+            std::vector<string> common_hand, std::vector<string> player_hand, string ante, string blind, string trip,
+            string play, string ante_win, string blind_win, string trip_win, string play_win, string dealer_win_type,
+            string player_win_type, uint64_t betnum, uint64_t winnum, string token, string actions, string pub_key);
+
     //@abi action
     void addpartner(const account_name partner, uint32_t rate);
 
@@ -154,7 +170,7 @@ public:
     bool ishold(string s);
     bool checkBiggerJack(uint32_t numbers[5]);
     uint32_t parsecard(string s);
-    void report(name from, uint64_t minemev, uint64_t meosin, uint64_t meosout, uint32_t gameid);
+    void report(name from, uint64_t minemev, uint64_t meosin, uint64_t meosout);
     uint32_t checkwin(uint32_t c1, uint32_t c2, uint32_t c3, uint32_t c4, uint32_t c5);
 
     uint32_t checkace(uint32_t numbers[5]);
@@ -212,6 +228,15 @@ private:
 
         uint64_t primary_key() const { return owner; }
         EOSLIB_SERIALIZE(st_bjnonces, (owner)(number))
+    };
+
+    // @abi table uthnonces i64
+    struct st_uthnonces {
+        name owner;
+        uint32_t number;
+
+        uint64_t primary_key() const { return owner; }
+        EOSLIB_SERIALIZE(st_uthnonces, (owner)(number))
     };
 
     // @abi table vppools i64
@@ -319,6 +344,27 @@ private:
         uint64_t primary_key() const { return owner; }
 
         EOSLIB_SERIALIZE(st_bjpools, (owner)(status)(nonce)(dcards)(dcnt)(pcards1)(pcnt1)(pcards2)(pcnt2)(bet)(insurance)(bettoken)(seed)(actions))
+    };
+
+
+    // @abi table uthpools i64
+    struct st_uthpools {
+        name owner;
+        uint32_t status;
+        uint64_t nonce;
+        uint64_t dcards;
+        uint64_t pcards;
+        uint64_t bet;
+        uint64_t trip;
+        uint64_t ante;
+        uint64_t play;
+        string bettoken;
+        string seed;
+        string actions;
+
+        uint64_t primary_key() const { return owner; }
+
+        EOSLIB_SERIALIZE(st_uthpools, (owner)(status)(nonce)(dcards)(pcards)(bet)(trip)(ante)(play)(bettoken)(seed)(actions))
     };
 
     // @abi table bjwins i64
@@ -529,6 +575,8 @@ private:
     typedef multi_index<N(bjwins), st_bjwins> _tb_bjwins;
     _tb_bjwins bjwins;
 
+    typedef multi_index<N(uthpools), st_uthpools> _tb_uthpools;
+    _tb_uthpools uthpools;
 
     typedef multi_index<N(pevents), st_pevents> _tb_pevents;
     _tb_pevents pevents;
@@ -557,6 +605,8 @@ private:
     _tb_nonces nonces;
     typedef multi_index<N(bjnonces), st_bjnonces> _tb_bjnonces;
     _tb_bjnonces bjnonces;
+    typedef multi_index<N(uthnonces), st_uthnonces> _tb_uthnonces;
+    _tb_uthnonces uthnonces;
 
     typedef multi_index<N(pubkeys), st_pubkeys> _tb_pubkeys;
     _tb_pubkeys pubkeys;
