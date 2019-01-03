@@ -487,7 +487,7 @@ void pokergame1::bjstand2(const name player, uint32_t nonce, std::vector<uint32_
 void pokergame1::bjreceipt(string game_id, const name player, string game, string seed,  std::vector<string> dealer_hand,
                             std::vector<string> player_hand1, std::vector<string> player_hand2, string bet, string win,
                             string insure_bet, string insure_win, uint64_t betnum, uint64_t winnum, uint64_t insurance,
-                            uint64_t insurance_win, string token, string actions) {
+                            uint64_t insurance_win, string token, string actions, string pub_key) {
 
     require_auth(N(eosvegasjack));
     require_recipient(player);
@@ -727,6 +727,11 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         eosio_assert(t.quantity.symbol == string_to_symbol(4, "IQ"), "Incorrect token type.");
         bettoken = "IQ";
         sanity_check(N(everipediaiq), N(transfer));
+    } else if (bettype == 4) {
+        eosio_assert(code == N(bitpietokens), "EUSD should be sent by bitpietokens.");
+        eosio_assert(t.quantity.symbol == string_to_symbol(8, "EUSD"), "Incorrect token type.");
+        bettoken = "EUSD";
+        sanity_check(N(bitpietokens), N(transfer));
     }
 
     eosio_assert(t.to == _self, "Transfer not made to this contract");
@@ -827,12 +832,18 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         eosio_assert(userseed.length() > 0, "user seed cannot by empty.");
         uint32_t nonce = increment_nonce(name{user});
 
-        if (gameid == 0 && bettoken != "MEV") {
-            eosio_assert(t.quantity.amount >= 100, "Jacks-or-Better: Below minimum bet threshold!");
-            eosio_assert(t.quantity.amount <= 100000, "Jacks-or-Better:Exceeds bet cap!");
-        } else if (gameid == 1 && bettoken != "MEV") {
-            eosio_assert(t.quantity.amount >= 500, "Jacks-or-Better 5x:Below minimum bet threshold!");
-            eosio_assert(t.quantity.amount <= 500000, "Jacks-or-Better 5x:Exceeds bet cap!");
+        if (gameid == 0 && bettoken == "EOS") {
+            eosio_assert(t.quantity.amount >= 1000, "Jacks-or-Better: Below minimum bet threshold!");
+            eosio_assert(t.quantity.amount <= 200000, "Jacks-or-Better:Exceeds bet cap!");
+        } else if (gameid == 1 && bettoken == "EOS") {
+            eosio_assert(t.quantity.amount >= 5000, "Jacks-or-Better 5x:Below minimum bet threshold!");
+            eosio_assert(t.quantity.amount <= 1000000, "Jacks-or-Better 5x:Exceeds bet cap!");
+        } else if (gameid == 0 && bettoken == "EUSD") {
+            eosio_assert(t.quantity.amount >= 2000, "Jacks-or-Better: Below minimum bet threshold!");
+            eosio_assert(t.quantity.amount <= 400000, "Jacks-or-Better:Exceeds bet cap!");
+        } else if (gameid == 1 && bettoken == "EUSD") {
+            eosio_assert(t.quantity.amount >= 10000, "Jacks-or-Better 5x:Below minimum bet threshold!");
+            eosio_assert(t.quantity.amount <= 2000000, "Jacks-or-Better 5x:Exceeds bet cap!");
         }
 
         auto itr_vppool = vppools.find(user);
@@ -852,12 +863,40 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         });
 
         if (bettoken == "EOS") {
+            /*
             // jackpot
             auto itr_pevent = pevents.find(0);
             pevents.modify(itr_pevent, _self, [&](auto &p) {
                 uint64_t tempam = t.quantity.amount * 0.001;
                 p.eosin += tempam;
             });
+            */
+
+            // new year
+            auto itr_newyear = newyears.find(user);
+            if (itr_newyear == newyears.end()) {
+                newyears.emplace(_self, [&](auto &p) {
+                    p.owner = name{user};
+                    p.status = 0;
+                    p.eosin = t.quantity.amount;
+                });
+            } else {
+                newyears.modify(itr_newyear, _self, [&](auto &p) {
+                    p.eosin += t.quantity.amount;
+                });
+            }
+
+            auto itr_tnewyear = tnewyears.find(0);
+            if (itr_tnewyear == tnewyears.end()) {
+                tnewyears.emplace(_self, [&](auto &p) {
+                    p.id = 0;
+                    p.eosin = t.quantity.amount;
+                });
+            } else {
+                tnewyears.modify(itr_tnewyear, _self, [&](auto &p) {
+                    p.eosin += t.quantity.amount;
+                });
+            }
 
             payref(name{user}, t.quantity.amount, 1, 4);
         }
@@ -880,9 +919,9 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
             eosio_assert(actionid == 1, "Blackjack: deposit first");
 
             //cap
-            if (bettoken != "MEV") {
+            if (bettoken == "EOS") {
                 eosio_assert(t.quantity.amount >= 1000, "Blackjack: Below minimum bet threshold!");
-                eosio_assert(t.quantity.amount <= 250000, "Blackjack:Exceeds bet cap!");
+                eosio_assert(t.quantity.amount <= 500000, "Blackjack:Exceeds bet cap!");
             }
 
             uint32_t nonce = increment_bjnonce(name{user});
@@ -1062,9 +1101,9 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         auto itr_uthpool = uthpools.find(user);
 
         if (actionid == 1) {
-            if (bettoken != "MEV") {
-                //eosio_assert(t.quantity.amount >= 100, "Jacks-or-Better: Below minimum bet threshold!");
-                eosio_assert(t.quantity.amount <= 10000, "UTH:Exceeds bet cap!");
+            if (bettoken == "EOS") {
+                eosio_assert(t.quantity.amount >= 2000, "UTH: Below minimum bet threshold!");
+                eosio_assert(t.quantity.amount <= 1000000, "UTH:Exceeds bet cap!");
             }
             eosio_assert(userseed.length() > 0, "user seed cannot by empty.");
             uint32_t nonce = increment_uthnonce(name{user});
@@ -1447,7 +1486,8 @@ void pokergame1::updatemevout(name player, uint32_t nonce, uint64_t mevout, uint
 }
 
 void pokergame1::vpreceipt(string game_id, const name player, string game, std::vector<string> player_hand,
-        string bet, string win, string wintype, string seed, string dealer_signature, uint64_t betnum, uint64_t winnum, string token) {
+        string bet, string win, string wintype, string seed, string dealer_signature, uint64_t betnum, uint64_t winnum,
+        string token, string pub_key) {
 
     require_auth(N(eosvegasjack));
 
@@ -1521,6 +1561,7 @@ void pokergame1::vpreceipt(string game_id, const name player, string game, std::
     }
     */
 
+    /*
     //jackpot
     int jackpot_idx = wintype.find("X250");
     if (jackpot_idx >= 0 && token == "EOS") {
@@ -1554,6 +1595,7 @@ void pokergame1::vpreceipt(string game_id, const name player, string game, std::
         });
         winnum += tempam;
     }
+*/
 
     if (token == "EOS") {
         auto itr_paccount = paccounts.find(player);
@@ -1590,6 +1632,15 @@ void pokergame1::vpreceipt(string game_id, const name player, string game, std::
                                                 std::string("Winner winner chicken dinner! 大吉大利，今晚吃鸡！- jacks.rovegas.com")))
                     .send();
         }
+    } else if (token == "EUSD") {
+        asset bal = asset(winnum, symbol_type(S(8, EUSD)));
+        if (bal.amount > 0) {
+            // withdraw
+            action(permission_level{_self, N(active)}, N(bitpietokens),
+                   N(transfer), std::make_tuple(_self, player, bal,
+                                                std::string("Winner winner chicken dinner! 大吉大利，今晚吃鸡！- jacks.rovegas.com")))
+                    .send();
+        }
     }
 
     vppools.erase(itr_vppool);
@@ -1598,7 +1649,7 @@ void pokergame1::vpreceipt(string game_id, const name player, string game, std::
 void pokergame1::vp5xreceipt(string game_id, const name player, string game, std::vector<string> player_hand1,
         std::vector<string> player_hand2, std::vector<string> player_hand3, std::vector<string> player_hand4,
         std::vector<string> player_hand5, string bet, string win, string wintype, string seed, string dealer_signature,
-        uint64_t betnum, uint64_t winnum, string token) {
+        uint64_t betnum, uint64_t winnum, string token, string pub_key) {
 
     require_auth(N(eosvegasjack));
 
@@ -1692,6 +1743,8 @@ void pokergame1::vp5xreceipt(string game_id, const name player, string game, std
     }
     */
 
+
+    /*
     int jackpot_idx = wintype.find("X250");
     if (jackpot_idx >= 0 && token == "EOS") {
         auto itr_pevent = pevents.find(0);
@@ -1724,6 +1777,7 @@ void pokergame1::vp5xreceipt(string game_id, const name player, string game, std
         });
         winnum += tempam;
     }
+     */
 
     if (token == "EOS") {
         auto itr_paccount = paccounts.find(player);
@@ -1756,6 +1810,15 @@ void pokergame1::vp5xreceipt(string game_id, const name player, string game, std
         if (bal.amount > 0) {
             // withdraw
             action(permission_level{_self, N(active)}, N(eosvegascoin),
+                   N(transfer), std::make_tuple(_self, player, bal,
+                                                std::string("Winner winner chicken dinner! 大吉大利，今晚吃鸡！- jacks.rovegas.com")))
+                    .send();
+        }
+    } else if (token == "EUSD") {
+        asset bal = asset(winnum, symbol_type(S(8, EUSD)));
+        if (bal.amount > 0) {
+            // withdraw
+            action(permission_level{_self, N(active)}, N(bitpietokens),
                    N(transfer), std::make_tuple(_self, player, bal,
                                                 std::string("Winner winner chicken dinner! 大吉大利，今晚吃鸡！- jacks.rovegas.com")))
                     .send();
@@ -2351,14 +2414,14 @@ void pokergame1::resetdivi() {
 
 
 void pokergame1::clear(account_name owner) {
-
     require_auth(_self);
     print("=======");
 
     auto itr = metadatas.find(0);
     metadatas.modify(itr, _self, [&](auto &p) {
-        p.teosout += 5000000;
+        p.teosout = p.teosin;
     });
+
 /*
     int cnt = 0;
     auto itr2 = mevouts.begin();
@@ -2762,6 +2825,49 @@ void pokergame1::setpubkey(string public_key) {
     }
 }
 
+void pokergame1::luck(const name player, uint64_t bonus, uint32_t status) {
+    require_auth(N(eosvegasjack));
+
+    auto itr = newyears.find(player);
+    eosio_assert(itr != newyears.end(), "2019: user not found");
+    eosio_assert(status == 1 || status == 2 || status == 3, "2019: invalid status");
+
+    uint32_t nextstatus = 0;
+    if (status == 1) {
+        eosio_assert(itr->status == 0, "2019: invalid status");
+        nextstatus = 1;
+    } else if (status == 2) {
+        nextstatus = 2;
+        eosio_assert(itr->status == 1, "2019: invalid status");
+        eosio_assert(bonus == 200000, "2019: incorrect number");
+
+        asset bal = asset(bonus, symbol_type(S(4, EOS)));
+        if (bal.amount > 0) {
+            // withdraw
+            action(permission_level{_self, N(active)}, N(eosio.token),
+                   N(transfer), std::make_tuple(_self, player, bal,
+                                                std::string("Happy New Year! Wish you a wonderful 2019! - www.rovegas.com")))
+                    .send();
+        }
+    } else {
+        eosio_assert(itr->status == 2, "2019: invalid status");
+        nextstatus = 2019;
+
+        asset bal = asset(bonus, symbol_type(S(4, EOS)));
+        if (bal.amount > 0) {
+            // withdraw
+            action(permission_level{_self, N(active)}, N(eosio.token),
+                   N(transfer), std::make_tuple(_self, player, bal,
+                                                std::string("Happy New Year! Wish you a wonderful 2019! - www.rovegas.com")))
+                    .send();
+        }
+    }
+
+    newyears.modify(itr, _self, [&](auto &p){
+        p.status = nextstatus;
+    });
+}
+
 #define EOSIO_ABI_EX( TYPE, MEMBERS ) \
 extern "C" { \
    void apply(uint64_t receiver, uint64_t code, uint64_t action) { \
@@ -2803,6 +2909,13 @@ extern "C" { \
               } \
               return; \
           } \
+          if (action == N(transfer) && code == N(bitpietokens)) { \
+              currency::transfer tr = unpack_action_data<currency::transfer>(); \
+              if (tr.to == self) { \
+                  thiscontract.deposit(tr, code, 4); \
+              } \
+              return; \
+          } \
           if (code != self) { \
               return; \
           } \
@@ -2813,4 +2926,4 @@ extern "C" { \
    } \
 }
 
-EOSIO_ABI_EX(pokergame1, (vpreceipt)(vp5xreceipt)(forceclear)(bjclear)(setseed)(setgameon)(setminingon)(signup)(getbonus)(ramclean)(blacklist)(init)(clear)(bjhit)(bjstand)(bjhit1)(bjstand1)(bjhit2)(bjstand2)(bjuninsure)(bjreceipt)(addpartner)(vpdraw)(resetdivi)(setpubkey)(uthfold)(uthcheck)(uthclear)(uthreceipt))
+EOSIO_ABI_EX(pokergame1, (vpreceipt)(vp5xreceipt)(forceclear)(bjclear)(setseed)(setgameon)(setminingon)(signup)(getbonus)(ramclean)(blacklist)(init)(clear)(bjhit)(bjstand)(bjhit1)(bjstand1)(bjhit2)(bjstand2)(bjuninsure)(bjreceipt)(addpartner)(vpdraw)(resetdivi)(setpubkey)(uthfold)(uthcheck)(uthclear)(uthreceipt)(luck))

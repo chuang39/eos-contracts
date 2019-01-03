@@ -66,16 +66,22 @@ public:
              pubkeys(_self, _self),
              prefs(_self, _self),
              mevouts(_self, _self),
-             bjmevouts(_self, _self){};
+             bjmevouts(_self, _self),
+             newyears(_self, _self),
+             tnewyears(_self, _self){};
+
+    //@abi action
+    void luck(const name player, uint64_t bonus, uint32_t status);
+
     //@abi action
     void vpreceipt(string game_id, const name player, string game, std::vector<string> player_hand,
                    string bet, string win, string wintype, string seed, string dealer_signature,
-                   uint64_t betnum, uint64_t winnum, string token);
+                   uint64_t betnum, uint64_t winnum, string token, string pub_key);
     //@abi action
     void vp5xreceipt(string game_id, const name player, string game, std::vector<string> player_hand1
             , std::vector<string> player_hand2, std::vector<string> player_hand3, std::vector<string> player_hand4,
             std::vector<string> player_hand5, string bet, string win, string wintype, string seed,
-            string dealer_signature, uint64_t betnum, uint64_t winnum, string token);
+            string dealer_signature, uint64_t betnum, uint64_t winnum, string token, string pub_key);
 
     //@abi action
     void clear(account_name owner);
@@ -145,7 +151,7 @@ public:
     void bjreceipt(string game_id, const name player, string game, string seed,  std::vector<string> dealer_hand,
                    std::vector<string> player_hand1, std::vector<string> player_hand2, string bet, string win,
                    string insure_bet, string insure_win, uint64_t betnum, uint64_t winnum, uint64_t insurance,
-                   uint64_t insurance_win, string token, string actions);
+                   uint64_t insurance_win, string token, string actions, string pub_key);
 
 
     //@abi action
@@ -550,6 +556,25 @@ private:
         EOSLIB_SERIALIZE(st_prefs, (owner)(partner))
     };
 
+    // @abi table newyears i64
+    struct st_newyears {
+        name owner;
+        uint64_t eosin;
+        uint32_t status;
+
+        uint64_t primary_key() const { return owner; }
+        EOSLIB_SERIALIZE(st_newyears, (owner)(eosin)(status))
+    };
+    // @abi table tnewyears i64
+    struct st_tnewyears {
+        uint64_t id;
+        uint64_t eosin;
+
+        uint64_t primary_key() const { return id; }
+        EOSLIB_SERIALIZE(st_tnewyears, (id)(eosin))
+    };
+
+
     typedef multi_index<N(metadatas), st_metadatas> _tb_metadatas;
     _tb_metadatas metadatas;
     typedef multi_index<N(pools), st_pools> _tb_pools;
@@ -615,4 +640,9 @@ private:
     _tb_mevouts mevouts;
     typedef multi_index<N(bjmevouts), st_bjmevouts> _tb_bjmevouts;
     _tb_bjmevouts bjmevouts;
+
+    typedef multi_index<N(newyears), st_newyears> _tb_newyears;
+    _tb_newyears newyears;
+    typedef multi_index<N(tnewyears), st_tnewyears> _tb_tnewyears;
+    _tb_tnewyears tnewyears;
 };
