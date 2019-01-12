@@ -702,7 +702,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
     eosio_assert(itr_blacklist == blacklists.end(), "Sorry, please be patient.");
 
     // No bet from eosvegascoin
-    if (t.from == N(eosvegascoin) || t.from == N(eosvegascorp) || t.from == N(eosvegasopmk)) {
+    if (t.from == N(eosvegascoin) || t.from == N(eosvegascorp) || t.from == N(eosvegasopmk) || t.from == N(gyytmnbwgige)) {
         return;
     }
 
@@ -834,16 +834,16 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
 
         if (gameid == 0 && bettoken == "EOS") {
             eosio_assert(t.quantity.amount >= 1000, "Jacks-or-Better: Below minimum bet threshold!");
-            eosio_assert(t.quantity.amount <= 200000, "Jacks-or-Better:Exceeds bet cap!");
+            eosio_assert(t.quantity.amount <= 2000000, "Jacks-or-Better:Exceeds bet cap!");
         } else if (gameid == 1 && bettoken == "EOS") {
             eosio_assert(t.quantity.amount >= 5000, "Jacks-or-Better 5x:Below minimum bet threshold!");
-            eosio_assert(t.quantity.amount <= 1000000, "Jacks-or-Better 5x:Exceeds bet cap!");
+            eosio_assert(t.quantity.amount <= 10000000, "Jacks-or-Better 5x:Exceeds bet cap!");
         } else if (gameid == 0 && bettoken == "EUSD") {
             eosio_assert(t.quantity.amount >= 2000, "Jacks-or-Better: Below minimum bet threshold!");
             eosio_assert(t.quantity.amount <= 400000, "Jacks-or-Better:Exceeds bet cap!");
         } else if (gameid == 1 && bettoken == "EUSD") {
             eosio_assert(t.quantity.amount >= 10000, "Jacks-or-Better 5x:Below minimum bet threshold!");
-            eosio_assert(t.quantity.amount <= 2000000, "Jacks-or-Better 5x:Exceeds bet cap!");
+            eosio_assert(t.quantity.amount <= 20000000, "Jacks-or-Better 5x:Exceeds bet cap!");
         }
 
         auto itr_vppool = vppools.find(user);
@@ -921,7 +921,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
             //cap
             if (bettoken == "EOS") {
                 eosio_assert(t.quantity.amount >= 1000, "Blackjack: Below minimum bet threshold!");
-                eosio_assert(t.quantity.amount <= 500000, "Blackjack:Exceeds bet cap!");
+                eosio_assert(t.quantity.amount <= 5000000, "Blackjack:Exceeds bet cap!");
             }
 
             uint32_t nonce = increment_bjnonce(name{user});
@@ -1103,7 +1103,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
         if (actionid == 1) {
             if (bettoken == "EOS") {
                 eosio_assert(t.quantity.amount >= 2000, "UTH: Below minimum bet threshold!");
-                eosio_assert(t.quantity.amount <= 1000000, "UTH:Exceeds bet cap!");
+                eosio_assert(t.quantity.amount <= 10000000, "UTH:Exceeds bet cap!");
             }
             eosio_assert(userseed.length() > 0, "user seed cannot by empty.");
             uint32_t nonce = increment_uthnonce(name{user});
@@ -1487,7 +1487,7 @@ void pokergame1::updatemevout(name player, uint32_t nonce, uint64_t mevout, uint
 
 void pokergame1::vpreceipt(string game_id, const name player, string game, std::vector<string> player_hand,
         string bet, string win, string wintype, string seed, string dealer_signature, uint64_t betnum, uint64_t winnum,
-        string token, string pub_key) {
+        string token, string pub_key, uint64_t event_win) {
 
     require_auth(N(eosvegasjack));
 
@@ -1601,6 +1601,8 @@ void pokergame1::vpreceipt(string game_id, const name player, string game, std::
         auto itr_paccount = paccounts.find(player);
         eosio_assert(itr_paccount != paccounts.end(), "Jacks-or-Better:User not found");
 
+        winnum = winnum + event_win;
+
         asset bal = asset(winnum, symbol_type(S(4, EOS)));
         if (bal.amount > 0) {
             // withdraw
@@ -1649,7 +1651,7 @@ void pokergame1::vpreceipt(string game_id, const name player, string game, std::
 void pokergame1::vp5xreceipt(string game_id, const name player, string game, std::vector<string> player_hand1,
         std::vector<string> player_hand2, std::vector<string> player_hand3, std::vector<string> player_hand4,
         std::vector<string> player_hand5, string bet, string win, string wintype, string seed, string dealer_signature,
-        uint64_t betnum, uint64_t winnum, string token, string pub_key) {
+        uint64_t betnum, uint64_t winnum, string token, string pub_key, uint64_t event_win) {
 
     require_auth(N(eosvegasjack));
 
@@ -1782,6 +1784,8 @@ void pokergame1::vp5xreceipt(string game_id, const name player, string game, std
     if (token == "EOS") {
         auto itr_paccount = paccounts.find(player);
         eosio_assert(itr_paccount != paccounts.end(), "Jacks-or-Better:User not found");
+
+        winnum = winnum + event_win;
 
         asset bal = asset(winnum, symbol_type(S(4, EOS)));
         if (bal.amount > 0) {

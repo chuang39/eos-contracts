@@ -76,12 +76,12 @@ public:
     //@abi action
     void vpreceipt(string game_id, const name player, string game, std::vector<string> player_hand,
                    string bet, string win, string wintype, string seed, string dealer_signature,
-                   uint64_t betnum, uint64_t winnum, string token, string pub_key);
+                   uint64_t betnum, uint64_t winnum, string token, string pub_key, uint64_t event_win);
     //@abi action
     void vp5xreceipt(string game_id, const name player, string game, std::vector<string> player_hand1
             , std::vector<string> player_hand2, std::vector<string> player_hand3, std::vector<string> player_hand4,
             std::vector<string> player_hand5, string bet, string win, string wintype, string seed,
-            string dealer_signature, uint64_t betnum, uint64_t winnum, string token, string pub_key);
+            string dealer_signature, uint64_t betnum, uint64_t winnum, string token, string pub_key, uint64_t event_win);
 
     //@abi action
     void clear(account_name owner);
