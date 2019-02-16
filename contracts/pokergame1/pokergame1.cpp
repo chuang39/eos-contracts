@@ -19,8 +19,8 @@ uint32_t bjvalues[13] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10};
 //string tokentable[1] = {"MEV"};
 
 // experience multiplier by game
-uint32_t expbygame[4] = {50, 50, 12, 50};
-uint32_t minebygame[4] = {100, 100, 25, 100};      // xN/100
+uint32_t expbygame[5] = {50, 50, 12, 12, 50};
+uint32_t minebygame[5] = {100, 100, 25, 25, 100};      // xN/100
 
 
 // check if the player wins or not
@@ -692,6 +692,26 @@ uint32_t pokergame1::increment_uthnonce(const name user) {
     return uthnonce;
 }
 
+uint32_t pokergame1::increment_pdnonce(const name user) {
+    // Get current nonce and increment it
+    uint32_t pdnonce =  0;
+    auto itr_pdnonce = pdnonces.find(user);
+    if (itr_pdnonce != pdnonces.end()) {
+        pdnonce = itr_pdnonce->number;
+    }
+    if (itr_pdnonce == pdnonces.end()) {
+        pdnonces.emplace(_self, [&](auto &p) {
+            p.owner = name{user};
+            p.number = 1;
+        });
+    } else {
+        pdnonces.modify(itr_pdnonce, _self, [&](auto &p) {
+            p.number += 1;
+        });
+    }
+    return pdnonce;
+}
+
 void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_t bettype) {
     // run sanity check here
     if (code == _self) {
@@ -815,7 +835,8 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
     // gameid 1: jacks-or-better 5x
     // gameid 2: blackjack
     // gameid 3: ultimate texas holdem
-    eosio_assert((gameid == 0 || gameid == 1 || gameid == 2 || gameid == 3 || gameid == 88), "Non-recognized game id");
+    // gameid 4: pokerdice
+    eosio_assert((gameid == 0 || gameid == 1 || gameid == 2 || gameid == 3 || gameid == 4 || gameid == 88), "Non-recognized game id");
     // metadatas[1] is blackjack, metadatas[2] is video poker.
     auto itr_metadata = gameid == 2 ? metadatas.find(1) : metadatas.find(2);
     auto itr_metadata2 = metadatas.find(0);
@@ -1137,7 +1158,7 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
             });
 
             if (bettoken == "EOS") {
-                payref(name{user}, t.quantity.amount, 1, 4);
+                payref(name{user}, t.quantity.amount, 1, 1);
             }
         } else if (actionid == 2) {
             // triple
@@ -1184,6 +1205,58 @@ void pokergame1::deposit(const currency::transfer &t, account_name code, uint32_
                 p.play = t.quantity.amount;
                 p.bet += t.quantity.amount;
             });
+        }
+
+    } else if (gameid == 4){
+        //pokerdice
+        auto itr_pdpool = pdpools.find(user);
+
+        if (bettoken == "EOS") {
+            eosio_assert(t.quantity.amount >= 2000, "PokerDice: Below minimum bet threshold!");
+            eosio_assert(t.quantity.amount <= 10000000, "PokerDice:Exceeds bet cap!");
+        }
+        eosio_assert(userseed.length() > 0, "user seed cannot by empty.");
+        uint32_t nonce = increment_pdnonce(name{user});
+        eosio_assert(itr_pdpool == pdpools.end(), "PokerDice: your last round is not finished. Please contact admin!");
+
+
+        string bet_cards = "";
+        string bet_value = "";
+
+        uint32_t betcardidx = usercomment.find("bet_cards[");
+        if (betcardidx > 0 && betcardidx != 4294967295)
+        {
+            uint32_t betcardpos = usercomment.find("]", betcardidx);
+            if (betcardpos > 0 && betcardpos != 4294967295)
+            {
+                bet_cards = usercomment.substr(betcardidx + 10, betcardpos - betcardidx - 10);
+            }
+        }
+
+        uint32_t valueidx = usercomment.find("bet_value[");
+        if (valueidx > 0 && valueidx != 4294967295)
+        {
+            uint32_t valuepos = usercomment.find("]", valueidx);
+            if (valuepos > 0 && valuepos != 4294967295)
+            {
+                bet_value = usercomment.substr(valueidx + 10, valuepos - valueidx - 10);
+            }
+        }
+
+
+        pdpools.emplace(_self, [&](auto &p) {
+            p.owner = name{user};
+            p.status = 1;
+            p.nonce = nonce;
+            p.seed = userseed;
+            p.bettoken = bettoken;
+            p.betcards = bet_cards;
+            p.betvalue = bet_value;
+            p.bet = t.quantity.amount;
+        });
+
+        if (bettoken == "EOS") {
+            payref(name{user}, t.quantity.amount, 1, 1);
         }
 
     } else if (gameid == 88) {
@@ -1357,6 +1430,66 @@ void pokergame1::uthreceipt(string game_id, const name player, string game, stri
 
 
 
+}
+
+
+void pokergame1::pdreceipt(string game_id, const name player, string game, string seed, string bet_result,
+                           string bet_cards, string bet_value, uint64_t betnum, uint64_t winnum, string token,
+                           string pub_key) {
+    require_auth(N(eosvegasjack));
+    require_recipient(player);
+
+    auto itr_pdpool = pdpools.find(player);
+    auto itr_metadata = metadatas.find(0);
+    eosio_assert(itr_pdpool != pdpools.end(), "PokerDice: cannot find uthpool");
+    eosio_assert(itr_pdpool->status == 1, "PokerDice: status should be 1");
+    eosio_assert(itr_pdpool->bet == betnum, "PokerDice: bet amount does not match");
+
+    int pos1 = seed.find("_");
+    eosio_assert(pos1 > 0, "PokerDice: seed is incorrect.");
+    string ucm = seed.substr(0, pos1);
+    uint32_t seednonce = stoi(ucm);
+    eosio_assert(seednonce == itr_pdpool->nonce, "PokerDice: nonce does not match.");
+
+    eosio_assert(token == itr_pdpool->bettoken, "PokerDice: bet token does not match.");
+
+    if (token == "EOS") {
+        auto itr_paccount = paccounts.find(player);
+        eosio_assert(itr_paccount != paccounts.end(), "PokerDice: user not found");
+
+        asset bal = asset(winnum, symbol_type(S(4, EOS)));
+        if (bal.amount > 0) {
+            // withdraw
+            action(permission_level{_self, N(active)}, N(eosio.token),
+                   N(transfer), std::make_tuple(_self, player, bal,
+                                                std::string("Winner winner chicken dinner! 大吉大利，今晚吃鸡！- pokerdice.rovegas.com")))
+                    .send();
+        }
+
+        uint64_t mineprice = getminingtableprice(itr_metadata->tmevout);
+        uint64_t minemev = betnum * mineprice * (1 + itr_paccount->level * 0.05) * minebygame[3] / (100*100);
+
+        report(player, minemev, betnum, winnum);
+
+        asset bal2 = asset(minemev, symbol_type(S(4, MEV)));
+        if (bal2.amount > 0) {
+            action(permission_level{_self, N(active)}, N(eosvegascoin),
+                   N(transfer), std::make_tuple(N(eosvegasjack), player, bal2,
+                                                std::string("Gaming deserves rewards! - pokerdice.rovegas.com")))
+                    .send();
+        }
+    } else if (token == "MEV") {
+        asset bal = asset(winnum, symbol_type(S(4, MEV)));
+        if (bal.amount > 0) {
+            // withdraw
+            action(permission_level{_self, N(active)}, N(eosvegascoin),
+                   N(transfer), std::make_tuple(_self, player, bal,
+                                                std::string("Winner winner chicken dinner! 大吉大利，今晚吃鸡！- pokerdice.rovegas.com")))
+                    .send();
+        }
+    }
+
+    pdpools.erase(itr_pdpool);
 }
 
 void pokergame1::report(name from, uint64_t minemev, uint64_t meosin, uint64_t meosout) {
@@ -2810,6 +2943,15 @@ void pokergame1::uthclear(const name from) {
     }
 }
 
+void pokergame1::pdclear(const name from) {
+    require_auth(N(eosvegasjack));
+
+    auto itr = pdpools.find(from);
+    if (itr != pdpools.end()) {
+        pdpools.erase(itr);
+    }
+}
+
 void pokergame1::setpubkey(string public_key) {
     require_auth(N(eosvegasjack));
 
@@ -2930,4 +3072,4 @@ extern "C" { \
    } \
 }
 
-EOSIO_ABI_EX(pokergame1, (vpreceipt)(vp5xreceipt)(forceclear)(bjclear)(setseed)(setgameon)(setminingon)(signup)(getbonus)(ramclean)(blacklist)(init)(clear)(bjhit)(bjstand)(bjhit1)(bjstand1)(bjhit2)(bjstand2)(bjuninsure)(bjreceipt)(addpartner)(vpdraw)(resetdivi)(setpubkey)(uthfold)(uthcheck)(uthclear)(uthreceipt)(luck))
+EOSIO_ABI_EX(pokergame1, (vpreceipt)(vp5xreceipt)(forceclear)(bjclear)(setseed)(setgameon)(setminingon)(signup)(getbonus)(ramclean)(blacklist)(init)(clear)(bjhit)(bjstand)(bjhit1)(bjstand1)(bjhit2)(bjstand2)(bjuninsure)(bjreceipt)(addpartner)(vpdraw)(resetdivi)(setpubkey)(uthfold)(uthcheck)(uthclear)(uthreceipt)(pdclear)(pdreceipt)(luck))

@@ -51,6 +51,7 @@ public:
              blacklists(_self, _self),
              bjpools(_self, _self),
              uthpools(_self, _self),
+             pdpools(_self, _self),
              pevents(_self, _self),
              puevents(_self, _self),
              bjwins(_self, _self),
@@ -63,6 +64,7 @@ public:
              bjnonces(_self, _self),
              vppools(_self, _self),
              uthnonces(_self, _self),
+             pdnonces(_self, _self),
              pubkeys(_self, _self),
              prefs(_self, _self),
              mevouts(_self, _self),
@@ -118,10 +120,13 @@ public:
     void bjclear(const name from);
     //@abi action
     void uthclear(const name from);
+    //@abi action
+    void pdclear(const name from);
 
     uint32_t increment_nonce(const name user);
     uint32_t increment_bjnonce(const name user);
     uint32_t increment_uthnonce(const name user);
+    uint32_t increment_pdnonce(const name user);
 
     //@abi action
     void bjstand(const name player, uint32_t nonce, std::vector<uint32_t> dealer_hand,
@@ -163,6 +168,11 @@ public:
             std::vector<string> common_hand, std::vector<string> player_hand, string ante, string blind, string trip,
             string play, string ante_win, string blind_win, string trip_win, string play_win, string dealer_win_type,
             string player_win_type, uint64_t betnum, uint64_t winnum, string token, string actions, string pub_key);
+    //@abi action
+    void pdreceipt(string game_id, const name player, string game, string seed, string bet_result,
+                               string bet_cards, string bet_value, uint64_t betnum, uint64_t winnum, string token,
+                               string pub_key);
+
 
     //@abi action
     void addpartner(const account_name partner, uint32_t rate);
@@ -243,6 +253,15 @@ private:
 
         uint64_t primary_key() const { return owner; }
         EOSLIB_SERIALIZE(st_uthnonces, (owner)(number))
+    };
+
+    // @abi table pdnonces i64
+    struct st_pdnonces {
+        name owner;
+        uint32_t number;
+
+        uint64_t primary_key() const { return owner; }
+        EOSLIB_SERIALIZE(st_pdnonces, (owner)(number))
     };
 
     // @abi table vppools i64
@@ -372,6 +391,24 @@ private:
 
         EOSLIB_SERIALIZE(st_uthpools, (owner)(status)(nonce)(dcards)(pcards)(bet)(trip)(ante)(play)(bettoken)(seed)(actions))
     };
+
+
+    // @abi table pdpools i64
+    struct st_pdpools {
+        name owner;
+        uint32_t status;
+        uint64_t nonce;
+        uint64_t bet;
+        string betvalue;
+        string betcards;
+        string bettoken;
+        string seed;
+
+        uint64_t primary_key() const { return owner; }
+
+        EOSLIB_SERIALIZE(st_pdpools, (owner)(status)(nonce)(bet)(betvalue)(betcards)(bettoken)(seed))
+    };
+
 
     // @abi table bjwins i64
     struct st_bjwins {
@@ -602,6 +639,8 @@ private:
 
     typedef multi_index<N(uthpools), st_uthpools> _tb_uthpools;
     _tb_uthpools uthpools;
+    typedef multi_index<N(pdpools), st_pdpools> _tb_pdpools;
+    _tb_pdpools pdpools;
 
     typedef multi_index<N(pevents), st_pevents> _tb_pevents;
     _tb_pevents pevents;
@@ -632,7 +671,8 @@ private:
     _tb_bjnonces bjnonces;
     typedef multi_index<N(uthnonces), st_uthnonces> _tb_uthnonces;
     _tb_uthnonces uthnonces;
-
+    typedef multi_index<N(pdnonces), st_pdnonces> _tb_pdnonces;
+    _tb_pdnonces pdnonces;
     typedef multi_index<N(pubkeys), st_pubkeys> _tb_pubkeys;
     _tb_pubkeys pubkeys;
 
